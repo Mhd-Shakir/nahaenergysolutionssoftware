@@ -51,195 +51,238 @@ export interface DetailedProposalData {
   remarks: string;
 }
 
-export function generateDetailedProposalPDF(data: DetailedProposalData) {
+export async function generateDetailedProposalPDF(data: DetailedProposalData) {
   const doc = new jsPDF();
-  const primaryColor: [number, number, number] = [0, 71, 255]; // #0047FF
+  const primaryColor: [number, number, number] = [11, 7, 215]; // #0B07D7
+  const secondaryColor: [number, number, number] = [67, 67, 249]; // #4343F9
+  const accentColor: [number, number, number] = [3, 14, 69]; // #030E45
+  const lightGray = [245, 245, 245];
+  const margin = 20;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
 
-  // Helper for section headers
-  const addSectionHeader = (text: string, y: number) => {
-    doc.setFontSize(14);
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.setFont('helvetica', 'bold');
-    doc.text(text, 20, y);
-    doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.line(20, y + 2, 190, y + 2);
-    doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'normal');
-    return y + 10;
+  // Helper for image loading
+  const loadImage = (url: string): Promise<HTMLImageElement> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = url;
+    });
   };
 
-  // Header
-  doc.setFontSize(22);
-  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.setFont('helvetica', 'bold');
-  doc.text(data.companyName || 'NAHA ENERGY SOLUTIONS', 105, 20, { align: 'center' });
-  
-  doc.setFontSize(10);
-  doc.setTextColor(100);
-  doc.setFont('helvetica', 'normal');
-  doc.text('SOLAR POWER PLANT PROPOSAL', 105, 28, { align: 'center' });
-  
-  doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.line(20, 35, 190, 35);
-
-  // Section 1: Client Information
-  let currentY = 45;
-  currentY = addSectionHeader('SECTION 1: CLIENT INFORMATION', currentY);
-  
-  autoTable(doc, {
-    startY: currentY,
-    body: [
-      ['Client Name:', data.clientName, 'Date:', data.date],
-      ['Designation:', data.designation, 'Project ID:', data.projectId],
-      ['Address:', data.address, 'Coordinates:', data.locationCoordinates],
-      ['Mobile:', data.mobileNumber, '', ''],
-    ],
-    theme: 'plain',
-    styles: { fontSize: 9, cellPadding: 2 },
-    columnStyles: { 
-      0: { fontStyle: 'bold', cellWidth: 30 },
-      1: { cellWidth: 60 },
-      2: { fontStyle: 'bold', cellWidth: 30 },
-      3: { cellWidth: 60 }
-    }
-  });
-
-  currentY = (doc as any).lastAutoTable.finalY + 10;
-
-  // Section 2: System Integrator
-  currentY = addSectionHeader('SECTION 2: SYSTEM INTEGRATOR', currentY);
-  
-  autoTable(doc, {
-    startY: currentY,
-    body: [
-      ['Company:', data.companyName, 'Province/State:', data.provinceState],
-      ['Address:', data.companyAddress, 'Email:', data.email],
-      ['Engineer:', data.projectEngineerName, 'Designation:', data.engineerDesignation],
-      ['Contact:', data.contactNumber, '', ''],
-    ],
-    theme: 'plain',
-    styles: { fontSize: 9, cellPadding: 2 },
-    columnStyles: { 
-      0: { fontStyle: 'bold', cellWidth: 30 },
-      1: { cellWidth: 60 },
-      2: { fontStyle: 'bold', cellWidth: 30 },
-      3: { cellWidth: 60 }
-    }
-  });
-
-  currentY = (doc as any).lastAutoTable.finalY + 10;
-
-  // Section 3: Product Specifications
-  currentY = addSectionHeader('SECTION 3: PRODUCT SPECIFICATIONS', currentY);
-  
-  autoTable(doc, {
-    startY: currentY,
-    head: [['Product', 'Brand', 'Specification', 'Warranty', 'Qty']],
-    body: data.products.map(p => [p.name, p.brand, p.specification, p.warranty, p.quantity]),
-    styles: { fontSize: 8 },
-    headStyles: { fillColor: primaryColor }
-  });
-
-  currentY = (doc as any).lastAutoTable.finalY + 10;
-
-  // Check if we need a new page
-  if (currentY > 240) {
-    doc.addPage();
-    currentY = 20;
+  try {
+    // 1. Sharp Vector Blue Bar (No pixelation)
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    
+    // 2. Add Logo (Centered and Proportionally scaled)
+    const brandedHeader = await loadImage('/backround-blue-white-logo.png');
+    
+    // Calculate aspect ratio to avoid stretching
+    const imgWidth = brandedHeader.width;
+    const imgHeight = brandedHeader.height;
+    const ratio = imgHeight / imgWidth;
+    
+    // Target size (Logo should occupy about 50-60% of the bar width)
+    const displayWidth = 80; 
+    const displayHeight = displayWidth * ratio;
+    
+    // Center it in the 40mm high bar
+    const x = (pageWidth - displayWidth) / 2;
+    const y = (40 - displayHeight) / 2;
+    
+    doc.addImage(brandedHeader, 'PNG', x, y, displayWidth, displayHeight);
+  } catch (e) {
+    console.error('Logo image could not be loaded', e);
   }
 
-  // Section 4: Cost Details
-  currentY = addSectionHeader('SECTION 4: COST DETAILS', currentY);
+  // Company Info (Below Blue Bar)
+  doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text(data.companyName || 'NAHA ENERGY SOLUTIONS', pageWidth - margin, 55, { align: 'right' });
   
-  autoTable(doc, {
-    startY: currentY,
-    body: [
-      ['Total Project Cost:', data.totalProjectCost],
-      ['Avg. Daily Production:', data.avgDailyEnergy],
-      ['Avg. Output per KW:', data.avgOutputPerKw],
-      ['Required Area per KW:', data.requiredAreaPerKw],
-    ],
-    theme: 'grid',
-    styles: { fontSize: 9, cellPadding: 3 },
-    columnStyles: { 
-      0: { fontStyle: 'bold', cellWidth: 50 },
-      1: { halign: 'right' }
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100);
+  const companyInfo = [
+    data.companyAddress || 'Solar Power Solutions',
+    data.email || '',
+    data.contactNumber || ''
+  ].filter(Boolean);
+  doc.text(companyInfo, pageWidth - margin, 62, { align: 'right', lineHeightFactor: 1.5 });
+
+  // Divider
+  doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.setLineWidth(0.8);
+  doc.line(margin, 82, pageWidth - margin, 82);
+
+  // Section Header Helper
+  const addSectionHeader = (text: string, y: number) => {
+    if (y > pageHeight - 50) {
+      doc.addPage();
+      y = 25;
     }
-  });
+    
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.rect(margin, y, 3, 7, 'F');
+    
+    doc.setFontSize(11);
+    doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+    doc.setFont('helvetica', 'bold');
+    doc.text(text, margin + 7, y + 5.5);
+    
+    doc.setDrawColor(240);
+    doc.setLineWidth(0.2);
+    doc.line(margin, y + 10, pageWidth - margin, y + 10);
+    
+    return y + 18;
+  };
 
-  currentY = (doc as any).lastAutoTable.finalY + 5;
-  
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Payment Schedule:', 20, currentY + 5);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.text('• 50% Advance with order', 25, currentY + 12);
-  doc.text('• 40% After material supply at site', 25, currentY + 17);
-  doc.text('• 10% On successful commissioning', 25, currentY + 22);
-
-  currentY += 30;
-
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Bank Details:', 20, currentY);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.text(`Bank: ${data.bankName} | IFSC: ${data.ifscCode}`, 25, currentY + 7);
-  doc.text(`Account: ${data.accountNumber} | Branch: ${data.branch}`, 25, currentY + 12);
-
-  currentY += 25;
-
-  // Section 5: Warranty
-  currentY = addSectionHeader('SECTION 5: WARRANTY', currentY);
+  // Section 1: Client Information
+  let currentY = 95;
+  currentY = addSectionHeader('CLIENT INFORMATION', currentY);
   
   autoTable(doc, {
     startY: currentY,
     body: [
-      ['Solar Module:', data.solarModuleWarranty],
-      ['Inverter:', data.inverterWarranty],
-      ['ACDB / DCDB:', data.acdbDcdbWarranty],
-      ['Surge Protector:', data.surgeProtectorWarranty],
+      ['Client Name', data.clientName, 'Date', data.date],
+      ['Designation', data.designation, 'Project ID', data.projectId],
+      ['Address', data.address, 'Coordinates', data.locationCoordinates],
+      ['Mobile', data.mobileNumber, '', ''],
     ],
     theme: 'plain',
-    styles: { fontSize: 9, cellPadding: 2 },
+    margin: { bottom: 30 },
+    styles: { fontSize: 9, cellPadding: 3, textColor: [60, 60, 60], font: 'helvetica' },
     columnStyles: { 
-      0: { fontStyle: 'bold', cellWidth: 40 },
-      1: { cellWidth: 100 }
+      0: { fontStyle: 'bold', cellWidth: 35, textColor: primaryColor },
+      1: { cellWidth: 55 },
+      2: { fontStyle: 'bold', cellWidth: 35, textColor: primaryColor },
+      3: { cellWidth: 55 }
     }
   });
 
-  currentY = (doc as any).lastAutoTable.finalY + 10;
+  currentY = (doc as any).lastAutoTable.finalY + 15;
 
-  // Section 6: Terms & Conditions
-  currentY = addSectionHeader('SECTION 6: TERMS & CONDITIONS', currentY);
-  const terms = [
-    '1. The proposal is valid for 15 days from the date of issue.',
-    '2. Standard structure height is up to 1 meter from the roof level.',
-    '3. Net metering approval is subject to KSEB feasibility.',
-    '4. Any civil work apart from structure grouting is not included.',
-    '5. Customer shall provide water and electricity during installation.'
-  ];
-  doc.setFontSize(8);
-  terms.forEach((term, i) => {
-    doc.text(term, 20, currentY + (i * 5));
+  // Section 2: Technical Specifications
+  currentY = addSectionHeader('SYSTEM COMPONENTS & SPECIFICATIONS', currentY);
+  
+  autoTable(doc, {
+    startY: currentY,
+    head: [['Component', 'Brand / Specification', 'Warranty', 'Qty']],
+    body: data.products.map(p => [p.name, p.brand + '\n' + p.specification, p.warranty, p.quantity]),
+    styles: { fontSize: 8.5, cellPadding: 5, font: 'helvetica', valign: 'middle' },
+    margin: { bottom: 30 }, // Prevent overlap with footer
+    headStyles: { 
+      fillColor: primaryColor, 
+      textColor: [255, 255, 255], 
+      fontStyle: 'bold',
+      halign: 'left'
+    },
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 40 },
+      1: { cellWidth: 80 },
+      2: { halign: 'center', cellWidth: 30 },
+      3: { halign: 'center', cellWidth: 20 }
+    },
+    alternateRowStyles: { fillColor: [252, 252, 255] }
   });
 
-  currentY += (terms.length * 5) + 10;
+  currentY = (doc as any).lastAutoTable.finalY + 15;
 
-  // Section 7: Signature
-  currentY = addSectionHeader('SECTION 7: SIGNATURE & REMARKS', currentY);
+  // Section 3: Financial Details
+  currentY = addSectionHeader('FINANCIAL SUMMARY', currentY);
   
+  autoTable(doc, {
+    startY: currentY,
+    body: [
+      ['Total Project Cost', `INR ${data.totalProjectCost}`],
+    ],
+    theme: 'grid',
+    margin: { bottom: 30 },
+    styles: { fontSize: 11, cellPadding: 8, font: 'helvetica' },
+    columnStyles: { 
+      0: { fontStyle: 'bold', cellWidth: 120, fillColor: [248, 249, 254] },
+      1: { halign: 'right', fontStyle: 'bold', textColor: primaryColor, fontSize: 13 }
+    }
+  });
+  
+  doc.setFontSize(8);
+  doc.setTextColor(120);
+  doc.text('* Inclusive of all Taxes, Structure, Installation & KSEB Charges', margin, (doc as any).lastAutoTable.finalY + 8);
+
+  currentY = (doc as any).lastAutoTable.finalY + 25;
+
+  // Warranty & Terms
+  currentY = addSectionHeader('WARRANTY & SERVICE TERMS', currentY);
+  
+  autoTable(doc, {
+    startY: currentY,
+    body: [
+      ['Solar PV Modules', data.solarModuleWarranty || '25-30 Years Performance Warranty'],
+      ['Grid-Tie Inverter', data.inverterWarranty || '5-10 Years Standard Warranty'],
+      ['ACDB / DCDB & Surge Protection', data.acdbDcdbWarranty || '1-5 Years Warranty'],
+      ['Workmanship & Maintenance', '5 Years Comprehensive Maintenance'],
+    ],
+    theme: 'plain',
+    margin: { bottom: 30 },
+    styles: { fontSize: 9, cellPadding: 3, font: 'helvetica' },
+    columnStyles: { 
+      0: { fontStyle: 'bold', cellWidth: 60, textColor: primaryColor },
+      1: { cellWidth: 110, textColor: [80, 80, 80] }
+    }
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY + 30;
+
+  // Signature Section
+  if (currentY > pageHeight - 60) {
+    doc.addPage();
+    currentY = 40;
+  }
+
+  doc.setDrawColor(200);
+  doc.setLineWidth(0.5);
+  
+  // Left: Authorized Signatory
+  doc.line(margin, currentY + 20, margin + 60, currentY + 20);
   doc.setFontSize(9);
-  doc.text(`Authorised Signatory: ${data.authorisedSignatory}`, 20, currentY + 5);
-  doc.text(`Date: ${data.signatureDate}`, 150, currentY + 5);
-  
-  currentY += 15;
+  doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
   doc.setFont('helvetica', 'bold');
-  doc.text('Remarks:', 20, currentY);
+  doc.text(data.authorisedSignatory || 'Authorised Signatory', margin, currentY + 26);
   doc.setFont('helvetica', 'normal');
-  doc.text(data.remarks || 'No additional remarks.', 20, currentY + 5, { maxWidth: 170 });
+  doc.setTextColor(120);
+  doc.text('Naha Energy Solutions', margin, currentY + 31);
+
+  // Right: Client Signature
+  const rightSignX = pageWidth - margin - 60;
+  doc.line(rightSignX, currentY + 20, pageWidth - margin, currentY + 20);
+  doc.setFontSize(9);
+  doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Client Acceptance', rightSignX, currentY + 26);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(120);
+  doc.text('Signature & Seal', rightSignX, currentY + 31);
+
+  // Footer on all pages
+  const totalPages = (doc as any).internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    
+    // Page border line
+    doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setLineWidth(0.5);
+    doc.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
+
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.setFont('helvetica', 'normal');
+    doc.text('nahaenergysolutions | www.nahaenergysolutions.com', pageWidth / 2, pageHeight - 13, { align: 'center' });
+    doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 13, { align: 'right' });
+  }
 
   // Save the PDF
-  doc.save(`Proposal_${data.projectId || 'Draft'}.pdf`);
+  doc.save(`${data.clientName.replace(/\s+/g, '_')}_Proposal.pdf`);
 }

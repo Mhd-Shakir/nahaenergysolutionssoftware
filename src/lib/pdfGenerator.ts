@@ -3,106 +3,160 @@ import autoTable from 'jspdf-autotable';
 import { Customer, Proposal } from '@/types';
 import { formatCurrency } from './subsidyCalc';
 
-export function generateProposalPDF(customer: Partial<Customer>, proposal: Partial<Proposal>) {
+export async function generateProposalPDF(customer: Partial<Customer>, proposal: Partial<Proposal>) {
   const doc = new jsPDF();
-  const primaryColor: [number, number, number] = [0, 71, 255]; // #0047FF
+  const primaryColor: [number, number, number] = [11, 7, 215]; // #0B07D7
+  const accentColor: [number, number, number] = [3, 14, 69]; // #030E45
+  const margin = 20;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
 
-  // Header
-  doc.setFontSize(22);
-  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.text('NAHA ENERGY SOLUTIONS', 105, 20, { align: 'center' });
-  
-  doc.setFontSize(10);
-  doc.setTextColor(100);
-  doc.text('MNRE Approved | KSEB Grid Connect System | Kerala', 105, 28, { align: 'center' });
-  
-  doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.line(20, 35, 190, 35);
+  // Helper for image loading
+  const loadImage = (url: string): Promise<HTMLImageElement> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = url;
+    });
+  };
 
-  // Title
+  try {
+    // 1. Vector Blue Bar
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.rect(0, 0, pageWidth, 35, 'F');
+    
+    // 2. Proportional Logo
+    const logoImg = await loadImage('/backround-blue-white-logo.png');
+    const ratio = logoImg.height / logoImg.width;
+    const displayWidth = 70;
+    const displayHeight = displayWidth * ratio;
+    const x = (pageWidth - displayWidth) / 2;
+    const y = (35 - displayHeight) / 2;
+    
+    doc.addImage(logoImg, 'PNG', x, y, displayWidth, displayHeight);
+  } catch (e) {
+    console.error('Logo failed to load', e);
+  }
+
+  // Company Name (Below Blue Bar)
+  doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
   doc.setFontSize(16);
-  doc.setTextColor(0);
-  doc.text(`Proposal for ${customer.system_kw} KW Grid-Tie Solar Power Plant`, 20, 45);
+  doc.setFont('helvetica', 'bold');
+  doc.text('NAHA ENERGY SOLUTIONS', margin, 50);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100);
+  doc.text('MNRE Approved | KSEB Grid Connect System | Kerala', margin, 56);
 
-  // Customer Details
+  // Customer & Project Info
   autoTable(doc, {
-    startY: 55,
-    head: [['Customer Details', 'Project Info']],
+    startY: 65,
+    head: [['Customer Details', 'Project Overview']],
     body: [
       [`Name: ${customer.name}`, `Project ID: ${customer.project_id}`],
       [`Address: ${customer.address}`, `Date: ${new Date().toLocaleDateString('en-IN')}`],
       [`Phone: ${customer.phone}`, `System Capacity: ${customer.system_kw} KW`],
-      ['District: ' + (customer.district || 'N/A'), `Daily Output: ${proposal.daily_output_min}-${proposal.daily_output_max} Units`],
     ],
     theme: 'plain',
-    styles: { fontSize: 10, cellPadding: 2 },
-    headStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0], fontStyle: 'bold' }
+    margin: { bottom: 30 },
+    styles: { fontSize: 9, cellPadding: 3, font: 'helvetica' },
+    headStyles: { fillColor: [248, 249, 254], textColor: primaryColor, fontStyle: 'bold' },
+    columnStyles: { 0: { cellWidth: 90 }, 1: { cellWidth: 80 } }
   });
 
-  // Products Table
-  const finalY = (doc as any).lastAutoTable.finalY + 10;
-  doc.setFontSize(12);
-  doc.text('System Components & Specifications', 20, finalY);
+  let currentY = (doc as any).lastAutoTable.finalY + 10;
+
+  // Section Header
+  const addHeader = (text: string, y: number) => {
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.rect(margin, y, 3, 6, 'F');
+    doc.setFontSize(11);
+    doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+    doc.setFont('helvetica', 'bold');
+    doc.text(text, margin + 6, y + 5);
+    return y + 10;
+  };
+
+  currentY = addHeader('SYSTEM COMPONENTS', currentY);
 
   autoTable(doc, {
-    startY: finalY + 5,
-    head: [['Product', 'Brand / Specification', 'Warranty', 'Qty']],
+    startY: currentY,
+    head: [['Component', 'Specification', 'Warranty', 'Qty']],
     body: [
-      ['Solar Module', `${customer.panel_brand} (Half Cut Mono Perc Bifacial DCR)`, '30 Year', 'Req'],
+      ['Solar Module', `${customer.panel_brand} Half Cut Mono Perc`, '30 Year', 'Req'],
       ['Grid Tie Inverter', `${customer.inverter_brand} (ISO Certified)`, '10 Year', '1'],
-      ['AC Surge Protector', 'Phoenix Contact/Havells (Type 2)', '1 Year', '1'],
-      ['DC Surge Protector', 'Citel/Mersen/Havells (600/1200V)', '1 Year', '2'],
-      ['Solar Meter', 'Vision Tek/Secure/L&T (Single Phase)', '5 Year', '1'],
-      ['Lightning Arrestor', '20MM x 1000MM Multi-Spike', '10 Year', '1'],
-      ['Mounting Structure', 'GI&GP Apollo/Tata', '10 Year', 'Req'],
-      ['Cables (AC/DC)', 'KBE/Polycab/Waaree (4/6MM)', '10 Year', 'Req'],
+      ['Surge Protection', 'AC/DC Type 2 Protection', '1 Year', 'Req'],
+      ['Solar Meter', 'Single/Three Phase Bi-Directional', '5 Year', '1'],
+      ['Structure', 'GI High Grade Mounting Structure', '10 Year', 'Req'],
+      ['Cables', 'Solar DC 4/6mm & AC Armoured', '10 Year', 'Req'],
     ],
-    styles: { fontSize: 9 },
-    headStyles: { fillColor: primaryColor }
+    styles: { fontSize: 8.5, cellPadding: 4.5, font: 'helvetica' },
+    margin: { bottom: 30 },
+    headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], halign: 'left' },
+    alternateRowStyles: { fillColor: [252, 252, 255] },
+    columnStyles: { 0: { fontStyle: 'bold' }, 2: { halign: 'center' }, 3: { halign: 'center' } }
   });
 
-  // Cost Breakdown
-  const costY = (doc as any).lastAutoTable.finalY + 10;
-  doc.setFontSize(12);
-  doc.text('Financial Summary', 20, costY);
+  currentY = (doc as any).lastAutoTable.finalY + 10;
+  currentY = addHeader('FINANCIAL SUMMARY', currentY);
 
   autoTable(doc, {
-    startY: costY + 5,
+    startY: currentY,
     body: [
       ['Actual Project Cost', formatCurrency(customer.actual_cost || 0)],
-      ['Central Subsidy (PM Surya Ghar)', `- ${formatCurrency(customer.subsidy || 0)}`],
-      ['Net Cost to Customer', { content: formatCurrency(customer.net_cost || 0), styles: { fontStyle: 'bold', fontSize: 12 } }],
+      ['Central Subsidy (Approx)', `- ${formatCurrency(customer.subsidy || 0)}`],
+      ['Net Cost to Customer', { content: formatCurrency(customer.net_cost || 0), styles: { fontStyle: 'bold', fontSize: 11 } }],
     ],
     theme: 'grid',
-    styles: { fontSize: 10, cellPadding: 5 },
+    margin: { bottom: 30 },
+    styles: { fontSize: 9.5, cellPadding: 5 },
     columnStyles: { 
-      1: { halign: 'right' } 
+      0: { cellWidth: 100, fontStyle: 'bold', fillColor: [250, 250, 250] },
+      1: { halign: 'right', textColor: primaryColor } 
     },
     didParseCell: (data) => {
-      if (data.row.index === 1 && data.column.index === 1) {
-        data.cell.styles.textColor = [0, 128, 0];
-      }
+      if (data.row.index === 1 && data.column.index === 1) data.cell.styles.textColor = [0, 150, 0];
     }
   });
 
-  // Footer & Terms
-  const footerY = (doc as any).lastAutoTable.finalY + 15;
-  doc.setFontSize(10);
-  doc.setTextColor(100);
-  doc.text('Notes & Warranty:', 20, footerY);
+  currentY = (doc as any).lastAutoTable.finalY + 12;
+
+  // Footer / Terms
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text('Notes & Bank Details:', margin, currentY);
+  
   doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100);
   const notes = [
-    '• Includes structure work, installation & KSEB Charges',
-    '• Average Energy Production: 4 units per KW per sunny day',
-    '• Required area: 80–100 sq ft per KW shade-free',
-    '• 5 Years Free AMC included | Complaint resolution within 2 working days',
-    '• Payment Terms: 50% advance, 40% after material supply, 10% on commissioning',
-    '• Bank: ICICI Bank | Kottakkal | A/C: 0942 0500 0938 | IFSC: ICIC0000942'
+    '• Includes installation, structure, KSEB charges and net metering approval.',
+    '• Performance warranty on panels: 25-30 years | AMC: 5 years free.',
+    '• Bank: ICICI Bank | A/C: 0942 0500 0938 | IFSC: ICIC0000942',
+    '• Payment: 50% Advance | 40% Delivery | 10% Commissioning.'
   ];
   notes.forEach((note, i) => {
-    doc.text(note, 20, footerY + 5 + (i * 5));
+    doc.text(note, margin, currentY + 6 + (i * 5));
   });
 
-  // Save the PDF
-  doc.save(`Naha_Proposal_${customer.project_id}.pdf`);
+  // Footer on all pages
+  const totalPages = (doc as any).internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    
+    // Page border line
+    doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setLineWidth(0.5);
+    doc.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
+
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.setFont('helvetica', 'normal');
+    doc.text('nahaenergysolutions | www.nahaenergysolutions.com', pageWidth / 2, pageHeight - 13, { align: 'center' });
+    doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 13, { align: 'right' });
+  }
+
+  doc.save(`${(customer.name || 'Proposal').replace(/\s+/g, '_')}.pdf`);
 }

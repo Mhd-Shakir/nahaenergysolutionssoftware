@@ -14,15 +14,33 @@ import {
   MapPin, 
   Smartphone,
   CreditCard,
-  CheckCircle2
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { generateDetailedProposalPDF, DetailedProposalData } from '@/lib/detailedPdfGenerator';
+import { createClient } from '@/lib/supabase/client';
+import { useRouter } from 'next/navigation';
 
-const PRODUCT_LIST = [
-  'Solar Module', 'Grid Tie Inverter', 'AC Surge Protector', 'DC Surge Protector', 
-  'Solar Meter', 'Lightning Arrestor', 'Lightning Earth', 'Earthing Compound', 
-  'Earthing Cables', 'Earthing Rod', 'AC Cable', 'DC Cable', 'Lightning Conductors', 
-  'MC4 Connectors', 'Mounting Structure', 'ACMCB', 'DCMCB'
+const DEFAULT_PRODUCTS = [
+  { name: 'Solar Module', brand: 'RAYZON, WAAREE, ADANI, RENEW', specification: 'Half cut mono perc bifacial - DCR Panels', warranty: '30 Year', quantity: '10 KW' },
+  { name: 'Grid Tie Inverter', brand: 'EVVO/DEYE (ISO Certified)', specification: '10 KW capacity', warranty: '10 Year', quantity: '1' },
+  { name: 'AC Surge Protector', brand: 'PHOENIX CONTACT/HAVELLS', specification: 'TYPE 2', warranty: '1 Year', quantity: '1' },
+  { name: 'DC Surge Protector', brand: 'CITEL/MERSEN/HAVELLS', specification: '600/1200 V', warranty: '1 Year', quantity: '2' },
+  { name: 'Solar Meter', brand: 'VISION TEK/SECURE/L&T/SOLTEK', specification: 'SINGLE PHASE', warranty: '5 years', quantity: '1' },
+  { name: 'Lightning Arrestor', brand: 'EXCELEARTHING/ECO SOLTEK', specification: '20 MMx1000 MM MULTI-SPIKE', warranty: '10 year', quantity: '1' },
+  { name: 'Lightning Earth', brand: 'EXCEL EARTHING/GI PIPE', specification: '4/5 FEET', warranty: '10 year', quantity: '1' },
+  { name: 'Earthing Compound', brand: 'EXCELEARTHING/ECO SOLTEK', specification: '5KG', warranty: 'N/A', quantity: '1' },
+  { name: 'Earthing Cables', brand: '10/12 SWG COPPER', specification: 'FULL COPPER', warranty: '10 year', quantity: '1 kg Approx' },
+  { name: 'Earthing Rod', brand: 'EXCELEARTHING/ECO SOLTEK', specification: 'Copperbonded Rod | 16-20 mm | 100 micron', warranty: '10 year', quantity: '3' },
+  { name: 'AC Cable', brand: 'KBE/POLYCAB', specification: '4/6 MM', warranty: '10 year', quantity: 'Req' },
+  { name: 'DC Cable', brand: 'WAREE/POLYCAB/HAVELLS/KANBEY', specification: '4MM', warranty: '10 year', quantity: 'Req' },
+  { name: 'Lightning Conductors', brand: 'EXCELEARTHING/ECO SOLTEK', specification: '50 SQUARE MM ALUMINUM', warranty: '10 year', quantity: 'Req' },
+  { name: 'Down Conductors', brand: 'EXCELEARTHING/ECO SOLTEK', specification: 'Standard GI/Copper', warranty: '10 year', quantity: 'Req' },
+  { name: 'MC4 Connectors', brand: 'WAREE/SIBASS', specification: 'Weatherproof', warranty: '10 year', quantity: 'Req' },
+  { name: 'Mounting Structure', brand: 'GI&GP APPOLO/TATA/EQUIVALENT', specification: '16 mm, Square Cube', warranty: '10 year', quantity: 'Req' },
+  { name: 'ACMCB', brand: 'HAVELLS/V-GUARD/SCHNEIDER', specification: '32 A Four pole', warranty: '10 Year', quantity: '1' },
+  { name: 'DCMCB', brand: 'HAVELLS/V-GUARD/SCHNEIDER', specification: '16 A', warranty: '10 Year', quantity: '2' }
 ];
 
 export default function NewProposalPage() {
@@ -34,23 +52,17 @@ export default function NewProposalPage() {
       designation: '',
       address: '',
       mobileNumber: '',
-      date: '',
-      projectId: '',
+      date: new Date().toISOString().split('T')[0],
+      projectId: `PJ-${Math.floor(1000 + Math.random() * 9000)}`,
       locationCoordinates: '',
-      companyName: '',
-      provinceState: '',
-      companyAddress: '',
-      projectEngineerName: '',
-      engineerDesignation: '',
-      email: '',
-      contactNumber: '',
-      products: PRODUCT_LIST.map(name => ({
-        name,
-        brand: '',
-        specification: '',
-        warranty: '',
-        quantity: ''
-      })),
+      companyName: 'NAHA ENERGY SOLUTIONS',
+      provinceState: 'Kerala',
+      companyAddress: 'MNRE Approved | KSEB Grid Connect System | Kerala',
+      projectEngineerName: 'Irfan',
+      engineerDesignation: 'Project Engineer',
+      email: 'nahaenergysolutions01@gmail.com',
+      contactNumber: '+91 80891 35003',
+      products: DEFAULT_PRODUCTS,
       totalProjectCost: '',
       avgDailyEnergy: '',
       avgOutputPerKw: '',
@@ -59,13 +71,13 @@ export default function NewProposalPage() {
       ifscCode: '',
       accountNumber: '',
       branch: '',
-      solarModuleWarranty: '',
-      inverterWarranty: '',
-      acdbDcdbWarranty: '',
-      surgeProtectorWarranty: '',
-      authorisedSignatory: '',
-      signatureDate: '',
-      remarks: ''
+      solarModuleWarranty: '30 Year Performance Warranty',
+      inverterWarranty: '10 Year Product Warranty',
+      acdbDcdbWarranty: '1 Year Warranty',
+      surgeProtectorWarranty: '1 Year Warranty',
+      authorisedSignatory: 'Manager - Naha Energy',
+      signatureDate: new Date().toISOString().split('T')[0],
+      remarks: 'Includes installation, structure, KSEB charges and net metering approval.'
     }
   });
 
@@ -74,27 +86,71 @@ export default function NewProposalPage() {
     name: "products"
   });
 
-  const onDownloadPDF = (data: DetailedProposalData) => {
-    generateDetailedProposalPDF(data);
+  const onDownloadPDF = async (data: DetailedProposalData) => {
+    await generateDetailedProposalPDF(data);
   };
+
+  const supabase = createClient();
+  const router = useRouter();
 
   const onSubmit = async (data: DetailedProposalData) => {
     setIsSubmitting(true);
-    // Simulate API call
-    console.log('Form Submitted:', data);
-    setTimeout(() => {
+    
+    try {
+      const amount = parseFloat(data.totalProjectCost.replace(/[^0-9.]/g, '')) || 0;
+      const kw = parseFloat(data.products.find(p => p.name.includes('Module'))?.quantity || '0') || 0;
+
+      // 1. Create/Update Customer entry
+      const { data: customer, error: custError } = await supabase
+        .from('customers')
+        .insert({
+          project_id: data.projectId || `PJ-${Math.floor(Math.random() * 10000)}`,
+          name: data.clientName,
+          phone: data.mobileNumber,
+          address: data.address,
+          system_kw: kw,
+          panel_brand: data.products.find(p => p.name.includes('Module'))?.brand || 'Standard',
+          inverter_brand: data.products.find(p => p.name.includes('Inverter'))?.brand || 'Standard',
+          actual_cost: amount,
+          subsidy: 0, // Default to 0, can be updated later
+          net_cost: amount,
+          status: 'quoted',
+          district: data.provinceState || 'Kerala',
+        })
+        .select()
+        .single();
+
+      if (custError) throw custError;
+
+      // 2. Record as a Sale for Analytics
+      const { error: saleError } = await supabase
+        .from('sales')
+        .insert({
+          customer_id: customer.id,
+          amount: amount,
+          district: data.provinceState || 'Kerala',
+          sale_date: new Date().toISOString()
+        });
+
+      if (saleError) throw saleError;
+
+      alert('Proposal submitted and revenue recorded!');
+      router.push('/customers');
+    } catch (err: any) {
+      console.error('Submission Error:', err);
+      alert('Error saving proposal: ' + err.message);
+    } finally {
       setIsSubmitting(false);
-      alert('Proposal submitted successfully!');
-    }, 1000);
+    }
   };
 
   const SectionHeader = ({ icon: Icon, title, section }: { icon: any, title: string, section: string }) => (
     <div className="flex items-center gap-3 border-b border-gray-100 pb-4 mb-6">
-      <div className="p-2 bg-[#0047FF]/10 rounded-lg">
-        <Icon className="w-5 h-5 text-[#0047FF]" />
+      <div className="p-2 bg-[#0B07D7]/10 rounded-lg">
+        <Icon className="w-5 h-5 text-[#0B07D7]" />
       </div>
       <div>
-        <p className="text-[10px] font-bold text-[#0047FF] uppercase tracking-wider">{section}</p>
+        <p className="text-[10px] font-bold text-[#0B07D7] uppercase tracking-wider">{section}</p>
         <h2 className="text-xl font-bold text-gray-900">{title}</h2>
       </div>
     </div>
@@ -107,16 +163,7 @@ export default function NewProposalPage() {
           <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Solar Proposal Form</h1>
           <p className="text-gray-500 mt-1 text-sm md:text-base">Fill in the details to generate a professional proposal document.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleSubmit(onDownloadPDF)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl hover:border-[#0047FF] hover:text-[#0047FF] font-bold transition-all shadow-sm"
-          >
-            <FileDown className="w-5 h-5" />
-            Download PDF
-          </button>
-        </div>
+
       </div>
 
       <form id="detailed-proposal-form" onSubmit={handleSubmit(onSubmit)} className="space-y-8">
@@ -127,31 +174,31 @@ export default function NewProposalPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Client Name</label>
-              <input {...register('clientName')} className="input-field" placeholder="Client name" />
+              <input {...register('clientName', { required: true })} className={cn("input-field", errors.clientName && "error")} placeholder="Client name" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Designation</label>
-              <input {...register('designation')} className="input-field" placeholder="Designation" />
+              <input {...register('designation', { required: true })} className={cn("input-field", errors.designation && "error")} placeholder="Designation" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Mobile Number</label>
-              <input {...register('mobileNumber')} className="input-field" placeholder="Mobile number" />
+              <input type="tel" {...register('mobileNumber', { required: true })} className={cn("input-field", errors.mobileNumber && "error")} placeholder="Mobile number" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Date</label>
-              <input {...register('date')} className="input-field" placeholder="Date" />
+              <input type="date" {...register('date', { required: true })} className={cn("input-field", errors.date && "error")} />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Project ID</label>
-              <input {...register('projectId')} className="input-field" placeholder="Project ID" />
+              <input {...register('projectId', { required: true })} className={cn("input-field", errors.projectId && "error")} placeholder="Project ID" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Location Coordinates</label>
-              <input {...register('locationCoordinates')} className="input-field" placeholder="Location coordinates" />
+              <input {...register('locationCoordinates', { required: true })} className={cn("input-field", errors.locationCoordinates && "error")} placeholder="Location coordinates" />
             </div>
             <div className="col-span-full space-y-2">
               <label className="text-sm font-bold text-gray-700">Address</label>
-              <textarea {...register('address')} rows={3} className="input-field resize-none" placeholder="Address" />
+              <textarea {...register('address', { required: true })} rows={3} className={cn("input-field resize-none", errors.address && "error")} placeholder="Address" />
             </div>
           </div>
         </div>
@@ -162,31 +209,31 @@ export default function NewProposalPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Company Name</label>
-              <input {...register('companyName')} className="input-field" placeholder="Company name" />
+              <input {...register('companyName', { required: true })} className={cn("input-field", errors.companyName && "error")} placeholder="Company name" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Province / State</label>
-              <input {...register('provinceState')} className="input-field" placeholder="Province / State" />
+              <input {...register('provinceState', { required: true })} className={cn("input-field", errors.provinceState && "error")} placeholder="Province / State" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Project Engineer Name</label>
-              <input {...register('projectEngineerName')} className="input-field" placeholder="Project engineer name" />
+              <input {...register('projectEngineerName', { required: true })} className={cn("input-field", errors.projectEngineerName && "error")} placeholder="Project engineer name" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Designation</label>
-              <input {...register('engineerDesignation')} className="input-field" placeholder="Designation" />
+              <input {...register('engineerDesignation', { required: true })} className={cn("input-field", errors.engineerDesignation && "error")} placeholder="Designation" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Email</label>
-              <input {...register('email')} className="input-field" placeholder="Email" />
+              <input type="email" {...register('email', { required: true })} className={cn("input-field", errors.email && "error")} placeholder="Email" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Contact Number</label>
-              <input {...register('contactNumber')} className="input-field" placeholder="Contact number" />
+              <input type="tel" {...register('contactNumber', { required: true })} className={cn("input-field", errors.contactNumber && "error")} placeholder="Contact number" />
             </div>
             <div className="col-span-full space-y-2">
               <label className="text-sm font-bold text-gray-700">Company Address</label>
-              <textarea {...register('companyAddress')} rows={2} className="input-field resize-none" placeholder="Company address" />
+              <textarea {...register('companyAddress', { required: true })} rows={2} className={cn("input-field resize-none", errors.companyAddress && "error")} placeholder="Company address" />
             </div>
           </div>
         </div>
@@ -210,21 +257,21 @@ export default function NewProposalPage() {
                   <tr key={field.id} className="hover:bg-gray-50/30 transition-colors">
                     <td className="px-8 py-3">
                       <input 
-                        {...register(`products.${index}.name`)} 
-                        className="w-full bg-transparent font-bold text-gray-900 outline-none border-b border-transparent focus:border-[#0047FF]" 
+                        {...register(`products.${index}.name`, { required: true })} 
+                        className={cn("w-full bg-transparent font-bold text-gray-900 outline-none border-b border-transparent focus:border-[#0B07D7]", errors.products?.[index]?.name && "error")} 
                       />
                     </td>
                     <td className="px-4 py-3">
-                      <input {...register(`products.${index}.brand`)} className="table-input" placeholder="Brand" />
+                      <input {...register(`products.${index}.brand`, { required: true })} className={cn("table-input", errors.products?.[index]?.brand && "error")} placeholder="Brand" />
                     </td>
                     <td className="px-4 py-3">
-                      <input {...register(`products.${index}.specification`)} className="table-input" placeholder="Specification" />
+                      <input {...register(`products.${index}.specification`, { required: true })} className={cn("table-input", errors.products?.[index]?.specification && "error")} placeholder="Specification" />
                     </td>
                     <td className="px-4 py-3">
-                      <input {...register(`products.${index}.warranty`)} className="table-input" placeholder="Warranty" />
+                      <input {...register(`products.${index}.warranty`, { required: true })} className={cn("table-input", errors.products?.[index]?.warranty && "error")} placeholder="Warranty" />
                     </td>
                     <td className="px-8 py-3">
-                      <input {...register(`products.${index}.quantity`)} className="table-input" placeholder="Quantity" />
+                      <input {...register(`products.${index}.quantity`, { required: true })} className={cn("table-input", errors.products?.[index]?.quantity && "error")} placeholder="Quantity" />
                     </td>
                   </tr>
                 ))}
@@ -236,54 +283,10 @@ export default function NewProposalPage() {
         {/* Section 4: Cost Details */}
         <div className="bg-white p-5 md:p-8 rounded-2xl md:rounded-3xl border border-gray-100 shadow-xl shadow-gray-50">
           <SectionHeader icon={CreditCard} section="Section 4" title="Cost Details" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Total Project Cost</label>
-              <input {...register('totalProjectCost')} className="input-field" placeholder="Total project cost" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-700">Avg. Daily Energy Production</label>
-              <input {...register('avgDailyEnergy')} className="input-field" placeholder="Average daily energy production" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-700">Average Output per kW</label>
-              <input {...register('avgOutputPerKw')} className="input-field" placeholder="Average output per kW" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-700">Required Area per kW</label>
-              <input {...register('requiredAreaPerKw')} className="input-field" placeholder="Required area per kW" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
-            {[
-              { label: '50% Advance', detail: 'Advance with order' },
-              { label: '40% Material Supply', detail: 'After material supply at site' },
-              { label: '10% Commissioning', detail: 'On commissioning' }
-            ].map((item, i) => (
-              <div key={i} className="p-5 bg-blue-50 rounded-2xl border border-blue-100">
-                <p className="text-sm font-black text-[#0047FF] uppercase tracking-wider">{item.label}</p>
-                <p className="text-xs text-blue-600 mt-1">{item.detail}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-700">Bank Name</label>
-              <input {...register('bankName')} className="input-field" placeholder="Bank name" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-700">IFSC Code</label>
-              <input {...register('ifscCode')} className="input-field" placeholder="IFSC code" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-700">Account Number</label>
-              <input {...register('accountNumber')} className="input-field" placeholder="Account number" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-700">Branch</label>
-              <input {...register('branch')} className="input-field" placeholder="Branch" />
+              <input type="number" {...register('totalProjectCost', { required: true })} className={cn("input-field", errors.totalProjectCost && "error")} placeholder="Enter amount" />
             </div>
           </div>
         </div>
@@ -294,19 +297,19 @@ export default function NewProposalPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Solar Module Warranty</label>
-              <input {...register('solarModuleWarranty')} className="input-field" placeholder="Solar module warranty" />
+              <input {...register('solarModuleWarranty', { required: true })} className={cn("input-field", errors.solarModuleWarranty && "error")} placeholder="Solar module warranty" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Inverter Warranty</label>
-              <input {...register('inverterWarranty')} className="input-field" placeholder="Inverter warranty" />
+              <input {...register('inverterWarranty', { required: true })} className={cn("input-field", errors.inverterWarranty && "error")} placeholder="Inverter warranty" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">ACDB / DCDB Warranty</label>
-              <input {...register('acdbDcdbWarranty')} className="input-field" placeholder="ACDB / DCDB warranty" />
+              <input {...register('acdbDcdbWarranty', { required: true })} className={cn("input-field", errors.acdbDcdbWarranty && "error")} placeholder="ACDB / DCDB warranty" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Surge Protector Warranty</label>
-              <input {...register('surgeProtectorWarranty')} className="input-field" placeholder="Surge protector warranty" />
+              <input {...register('surgeProtectorWarranty', { required: true })} className={cn("input-field", errors.surgeProtectorWarranty && "error")} placeholder="Surge protector warranty" />
             </div>
           </div>
         </div>
@@ -336,31 +339,47 @@ export default function NewProposalPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Authorised Signatory Name</label>
-              <input {...register('authorisedSignatory')} className="input-field" placeholder="Authorised signatory name" />
+              <input {...register('authorisedSignatory', { required: true })} className={cn("input-field", errors.authorisedSignatory && "error")} placeholder="Authorised signatory name" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Date</label>
-              <input {...register('signatureDate')} className="input-field" placeholder="Date" />
+              <input type="date" {...register('signatureDate', { required: true })} className={cn("input-field", errors.signatureDate && "error")} />
             </div>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-bold text-gray-700">Remarks</label>
-            <textarea {...register('remarks')} rows={4} className="input-field resize-none" placeholder="Remarks" />
+            <textarea {...register('remarks', { required: true })} rows={4} className={cn("input-field resize-none", errors.remarks && "error")} placeholder="Remarks" />
           </div>
         </div>
 
-        <div className="flex justify-center pt-8">
+        <div className="flex flex-col md:flex-row items-center justify-center gap-4 pt-12">
+          {Object.keys(errors).length > 0 && (
+            <div className="w-full mb-4 p-4 bg-rose-50 border border-rose-100 rounded-xl flex items-center gap-3 text-rose-700 animate-bounce">
+              <AlertCircle className="w-5 h-5" />
+              <p className="text-sm font-bold">Please fill in all required fields to proceed.</p>
+            </div>
+          )}
+          
+          <button
+            type="button"
+            onClick={handleSubmit(onDownloadPDF)}
+            className="flex items-center gap-2 px-8 py-4 bg-white border-2 border-gray-200 text-gray-700 rounded-2xl hover:border-[#0B07D7] hover:text-[#0B07D7] font-black text-lg transition-all shadow-xl shadow-gray-100"
+          >
+            <FileDown className="w-6 h-6" />
+            Preview PDF
+          </button>
+          
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex items-center gap-2 px-12 py-4 bg-[#0047FF] text-white rounded-2xl hover:bg-[#0036CC] font-black text-lg shadow-2xl shadow-blue-200 transition-all disabled:opacity-50"
+            className="flex items-center gap-2 px-12 py-4 bg-[#0B07D7] text-white rounded-2xl hover:bg-[#0805a3] font-black text-lg shadow-2xl shadow-blue-200 transition-all disabled:opacity-50"
           >
             {isSubmitting ? (
               <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
               <CheckCircle2 className="w-6 h-6" />
             )}
-            Submit Proposal
+            Submit & Save
           </button>
         </div>
 
@@ -379,8 +398,12 @@ export default function NewProposalPage() {
           outline: none;
         }
         .input-field:focus {
-          border-color: #0047FF;
-          box-shadow: 0 0 0 4px rgba(0, 71, 255, 0.05);
+          border-color: #0B07D7;
+          box-shadow: 0 0 0 4px rgba(11, 7, 215, 0.05);
+        }
+        .input-field.error {
+          border-color: #ef4444;
+          background-color: #fef2f2;
         }
         .table-input {
           width: 100%;
@@ -392,7 +415,10 @@ export default function NewProposalPage() {
           transition: border-color 0.2s;
         }
         .table-input:focus {
-          border-color: #0047FF;
+          border-color: #0B07D7;
+        }
+        .table-input.error {
+          border-color: #ef4444;
         }
         .input-field::placeholder {
           color: #9ca3af;

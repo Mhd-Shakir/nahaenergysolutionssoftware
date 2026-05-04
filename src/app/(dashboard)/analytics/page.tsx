@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import MetricCard from '@/components/MetricCard';
 import RevenueChart from '@/components/charts/RevenueChart';
 import DistrictChart from '@/components/charts/DistrictChart';
@@ -15,108 +15,150 @@ import {
   PieChart as PieIcon,
   Calendar,
   Clock,
-  ChevronDown
+  ChevronDown,
+  MapPin
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type Period = 'day' | 'week' | 'month' | 'year';
 
+interface SaleEntry {
+  amount: number;
+  sale_date: string;
+  district: string;
+  customer_id?: string;
+}
+
 export default function AnalyticsPage() {
   const [period, setPeriod] = useState<Period>('month');
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalSales: 4500000,
-    avgDealSize: 350000,
-    convRate: 24.5,
-    totalKw: 145
-  });
+  const [salesData, setSalesData] = useState<SaleEntry[]>([]);
+  const [customersData, setCustomersData] = useState<any[]>([]);
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
-    fetchStats();
-  }, [period]);
+    fetchData();
+  }, []);
 
-  async function fetchStats() {
+  async function fetchData() {
     setLoading(true);
-    // In a real app, we would add filters based on the period (day, week, month, year)
-    // For now we simulate the loading and use period-based multipliers for mock visual changes
-    
-    // Fetch real base data
-    const { data: sales } = await supabase.from('sales').select('amount');
-    const { data: customers } = await supabase.from('customers').select('status, system_kw');
-
-    const baseSales = sales?.reduce((acc, s) => acc + s.amount, 0) || 0;
-    const baseKw = customers?.filter(c => c.status === 'completed').reduce((acc, c) => acc + (c.system_kw || 0), 0) || 0;
-    
-    // Mock multiplier based on period to show some change
-    const multiplier = period === 'day' ? 0.05 : period === 'week' ? 0.25 : period === 'month' ? 1 : 12;
-
-    setStats({
-      totalSales: (baseSales || 4500000) * multiplier,
-      avgDealSize: 350000, // Stays same for demo
-      convRate: 24.5 + (period === 'year' ? 5 : 0),
-      totalKw: (baseKw || 145) * multiplier
-    });
-
-    setLoading(false);
+    try {
+      const { data: sales } = await supabase.from('sales').select('*');
+      const { data: customers } = await supabase.from('customers').select('*');
+      
+      setSalesData(sales || []);
+      setCustomersData(customers || []);
+    } catch (err) {
+      console.error('Error fetching analytics:', err);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  // Mock chart data variations
-  const getMonthlyData = () => {
-    if (period === 'year') return [
-      { month: 'Q1', revenue: 4200000 },
-      { month: 'Q2', revenue: 5500000 },
-      { month: 'Q3', revenue: 4800000 },
-      { month: 'Q4', revenue: 6500000 },
-    ];
-    if (period === 'week') return [
-      { month: 'Mon', revenue: 120000 },
-      { month: 'Tue', revenue: 150000 },
-      { month: 'Wed', revenue: 180000 },
-      { month: 'Thu', revenue: 220000 },
-      { month: 'Fri', revenue: 190000 },
-      { month: 'Sat', revenue: 250000 },
-      { month: 'Sun', revenue: 100000 },
-    ];
-    if (period === 'day') return [
-      { month: '6AM', revenue: 20000 },
-      { month: '10AM', revenue: 45000 },
-      { month: '2PM', revenue: 80000 },
-      { month: '6PM', revenue: 35000 },
-      { month: '10PM', revenue: 15000 },
-    ];
-    return [
-      { month: 'Jan', revenue: 1200000 },
-      { month: 'Feb', revenue: 1500000 },
-      { month: 'Mar', revenue: 1800000 },
-      { month: 'Apr', revenue: 2200000 },
-      { month: 'May', revenue: 1900000 },
-      { month: 'Jun', revenue: 2500000 },
-    ];
-  };
+  const filteredStats = useMemo(() => {
+    const now = new Date();
+    let startDate = new Date();
 
-  const districtData = [
-    { district: 'Malappuram', sales: 45 },
-    { district: 'Calicut', sales: 32 },
-    { district: 'Palakkad', sales: 28 },
-    { district: 'Thrissur', sales: 22 },
-    { district: 'Ernakulam', sales: 18 },
-  ];
+    if (period === 'day') startDate.setHours(0, 0, 0, 0);
+    else if (period === 'week') startDate.setDate(now.getDate() - 7);
+    else if (period === 'month') startDate.setMonth(now.getMonth() - 1);
+    else if (period === 'year') startDate.setFullYear(now.getFullYear() - 1);
 
-  const sizeData = [
-    { name: '1-3 KW', value: 40 },
-    { name: '4-6 KW', value: 30 },
-    { name: '8-10 KW', value: 20 },
-    { name: 'Above 10 KW', value: 10 },
-  ];
+    const filteredSales = salesData.filter(s => new Date(s.sale_date) >= startDate);
+    const totalSales = filteredSales.reduce((acc, s) => acc + s.amount, 0);
+    const avgDealSize = filteredSales.length > 0 ? totalSales / filteredSales.length : 0;
+    
+    const completedCustomers = customersData.filter(c => 
+      c.status === 'completed' && new Date(c.created_at) >= startDate
+    );
+    const totalKw = completedCustomers.reduce((acc, c) => acc + (c.system_kw || 0), 0);
+    
+    const totalLeads = customersData.filter(c => new Date(c.created_at) >= startDate).length;
+    const convRate = totalLeads > 0 ? (completedCustomers.length / totalLeads) * 100 : 0;
+
+    return { totalSales, avgDealSize, convRate, totalKw, filteredSales };
+  }, [salesData, customersData, period]);
+
+  const revenueChartData = useMemo(() => {
+    const { filteredSales } = filteredStats;
+    
+    if (period === 'day') {
+      const hours = ['6AM', '10AM', '2PM', '6PM', '10PM'];
+      return hours.map(h => ({
+        month: h,
+        revenue: filteredSales.length > 0 ? filteredSales[0].amount / hours.length : 0 // Simplified for day
+      }));
+    }
+
+    if (period === 'week') {
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      return days.map((d, i) => {
+        const daySales = filteredSales.filter(s => new Date(s.sale_date).getDay() === (i + 1) % 7);
+        return {
+          month: d,
+          revenue: daySales.reduce((acc, s) => acc + s.amount, 0)
+        };
+      });
+    }
+
+    // Default: Month/Year
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const currentMonth = new Date().getMonth();
+    const displayMonths = months.slice(Math.max(0, currentMonth - 5), currentMonth + 1);
+
+    return displayMonths.map((m, i) => {
+      const monthIndex = months.indexOf(m);
+      const mSales = filteredSales.filter(s => new Date(s.sale_date).getMonth() === monthIndex);
+      return {
+        month: m,
+        revenue: mSales.reduce((acc, s) => acc + s.amount, 0)
+      };
+    });
+  }, [filteredStats, period]);
+
+  const districtData = useMemo(() => {
+    const districts: Record<string, number> = {};
+    filteredStats.filteredSales.forEach(s => {
+      districts[s.district] = (districts[s.district] || 0) + 1;
+    });
+    return Object.entries(districts)
+      .map(([district, sales]) => ({ district, sales }))
+      .sort((a, b) => b.sales - a.sales)
+      .slice(0, 5);
+  }, [filteredStats]);
+
+  const sizeData = useMemo(() => {
+    const sizes = [
+      { name: '1-3 KW', min: 0, max: 3, value: 0 },
+      { name: '4-6 KW', min: 4, max: 6, value: 0 },
+      { name: '8-10 KW', min: 8, max: 10, value: 0 },
+      { name: 'Above 10 KW', min: 11, max: 1000, value: 0 },
+    ];
+    
+    customersData.forEach(c => {
+      const kw = c.system_kw || 0;
+      const range = sizes.find(s => kw >= s.min && kw <= s.max);
+      if (range) range.value++;
+    });
+    
+    return sizes.map(({ name, value }) => ({ name, value }));
+  }, [customersData]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <Loader2 className="w-10 h-10 animate-spin text-[#0047FF]" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Advanced Analytics</h1>
-          <p className="text-gray-500 text-sm">Deep dive into sales performance and installation metrics.</p>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Advanced Analytics</h1>
+          <p className="text-gray-500 text-sm">Real-time performance tracking based on proposal submissions.</p>
         </div>
         
         <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
@@ -125,13 +167,13 @@ export default function AnalyticsPage() {
               key={p}
               onClick={() => setPeriod(p)}
               className={cn(
-                "px-4 py-2 text-xs font-bold rounded-lg transition-all",
+                "px-4 py-2 text-xs font-black rounded-lg transition-all",
                 period === p 
                   ? "bg-[#0047FF] text-white shadow-md shadow-blue-100" 
                   : "text-gray-500 hover:bg-gray-50"
               )}
             >
-              {p.charAt(0).toUpperCase() + p.slice(1)}
+              {p.toUpperCase()}
             </button>
           ))}
         </div>
@@ -139,57 +181,57 @@ export default function AnalyticsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricCard 
-          label={period === 'day' ? "Today's Sales" : period === 'week' ? "Weekly Sales" : "Total Sales (FY)"}
-          value={formatCurrency(stats.totalSales)} 
+          label={period === 'day' ? "Today's Revenue" : period === 'week' ? "Weekly Revenue" : "Revenue Growth"}
+          value={formatCurrency(filteredStats.totalSales)} 
           color="amber"
           icon={<TrendingUp className="w-6 h-6" />}
         />
         <MetricCard 
           label="Average Deal Size" 
-          value={formatCurrency(stats.avgDealSize)} 
+          value={formatCurrency(filteredStats.avgDealSize)} 
           icon={<BarChart3 className="w-6 h-6" />}
         />
         <MetricCard 
           label="Conversion Rate" 
-          value={`${stats.convRate.toFixed(1)}%`} 
+          value={`${filteredStats.convRate.toFixed(1)}%`} 
           color="green"
           icon={<Users className="w-6 h-6" />}
         />
         <MetricCard 
-          label="KW Installed" 
-          value={`${stats.totalKw.toFixed(0)} KW`} 
+          label="KW Commissioned" 
+          value={`${filteredStats.totalKw.toFixed(1)} KW`} 
           color="blue"
           icon={<Zap className="w-6 h-6" />}
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden group">
+        <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between mb-8">
             <h3 className="font-bold text-gray-900 flex items-center gap-2">
               <Calendar className="w-5 h-5 text-[#0047FF]" /> 
-              {period === 'day' ? 'Hourly Performance' : period === 'week' ? 'Daily Growth' : 'Revenue Growth'}
+              {period === 'day' ? 'Hourly Performance' : period === 'week' ? 'Daily Growth' : 'Revenue Trends'}
             </h3>
-            <div className="flex items-center gap-1 text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded-full">
-              <TrendingUp className="w-3 h-3" /> +14.2%
+            <div className="flex items-center gap-1 text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded-full uppercase tracking-widest">
+              <TrendingUp className="w-3 h-3" /> Live
             </div>
           </div>
-          <RevenueChart data={getMonthlyData()} />
+          <RevenueChart data={revenueChartData} />
         </div>
 
         <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between mb-8">
             <h3 className="font-bold text-gray-900 flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-[#0047FF]" /> Revenue by District
+              <MapPin className="w-5 h-5 text-[#0047FF]" /> Sales by District
             </h3>
           </div>
-          <DistrictChart data={districtData} />
+          <DistrictChart data={districtData.length > 0 ? districtData : [{ district: 'No Data', sales: 0 }]} />
         </div>
 
         <div className="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between mb-8">
             <h3 className="font-bold text-gray-900 flex items-center gap-2">
-              <PieIcon className="w-5 h-5 text-[#0047FF]" /> Sales by System Size
+              <PieIcon className="w-5 h-5 text-[#0047FF]" /> Distribution by Size
             </h3>
           </div>
           <SalesChart data={sizeData} />
@@ -201,25 +243,24 @@ export default function AnalyticsPage() {
           </div>
           
           <div>
-            <h3 className="text-2xl font-black mb-2 tracking-tight">Performance Summary</h3>
+            <h3 className="text-2xl font-black mb-2 tracking-tight uppercase">System Health</h3>
             <p className="text-blue-200/60 text-sm leading-relaxed max-w-sm">
-              Your installation capacity has increased by <span className="text-white font-bold">24%</span> compared to the previous period. The Malappuram district remains the top performer with a 35% market share.
+              Your proposal-to-sale pipeline is active. Current period reflects <span className="text-white font-bold">{filteredStats.filteredSales.length}</span> recorded sales across <span className="text-white font-bold">{districtData.length}</span> districts.
             </p>
           </div>
           
           <div className="grid grid-cols-2 gap-4 mt-8">
-            <div className="bg-white/5 p-5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all cursor-default">
-              <p className="text-[10px] text-blue-300 font-bold uppercase tracking-widest mb-1">Target Achievement</p>
+            <div className="bg-white/5 p-5 rounded-2xl border border-white/10">
+              <p className="text-[10px] text-blue-300 font-bold uppercase tracking-widest mb-1">Live Feed</p>
               <div className="flex items-end gap-2">
-                <p className="text-2xl font-black text-white">84%</p>
-                <p className="text-[10px] text-green-400 font-bold mb-1">+5.2%</p>
+                <p className="text-2xl font-black text-white">Active</p>
+                <div className="w-2 h-2 rounded-full bg-green-400 mb-2 animate-pulse" />
               </div>
             </div>
-            <div className="bg-white/5 p-5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all cursor-default">
-              <p className="text-[10px] text-blue-300 font-bold uppercase tracking-widest mb-1">Market Reach</p>
+            <div className="bg-white/5 p-5 rounded-2xl border border-white/10">
+              <p className="text-[10px] text-blue-300 font-bold uppercase tracking-widest mb-1">Data Source</p>
               <div className="flex items-end gap-2">
-                <p className="text-2xl font-black text-white">18.5%</p>
-                <p className="text-[10px] text-blue-400 font-bold mb-1">Global</p>
+                <p className="text-xl font-black text-white">Cloud DB</p>
               </div>
             </div>
           </div>
@@ -229,6 +270,6 @@ export default function AnalyticsPage() {
   );
 }
 
-const MapPin = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+const Loader2 = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
 );

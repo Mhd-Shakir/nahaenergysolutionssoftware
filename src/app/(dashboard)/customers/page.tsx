@@ -1,22 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Customer, ProjectStatus } from '@/types';
 import { formatCurrency } from '@/lib/subsidyCalc';
+import { generateProposalPDF } from '@/lib/pdfGenerator';
 import { 
   Search, 
   Filter, 
-  MoreHorizontal, 
   Eye, 
-  Edit3, 
   Trash2,
   Loader2,
-  ExternalLink,
-  ChevronRight,
-  ChevronLeft,
   AlertCircle,
-  MapPin
+  MapPin,
+  RefreshCcw,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  FileText,
+  Download,
+  ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -27,19 +30,26 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'all'>('all');
-  const supabase = createClient();
+  const [error, setError] = useState<string | null>(null);
+  
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     fetchCustomers();
 
-    // Set up realtime subscription
     const channel = supabase
-      .channel('customers-changes')
+      .channel('customers-realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'customers' },
-        () => {
-          fetchCustomers();
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setCustomers(prev => [payload.new as Customer, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            setCustomers(prev => prev.map(c => c.id === payload.new.id ? payload.new as Customer : c));
+          } else if (payload.eventType === 'DELETE') {
+            setCustomers(prev => prev.filter(c => c.id === payload.old.id));
+          }
         }
       )
       .subscribe();
@@ -47,147 +57,214 @@ export default function CustomersPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [supabase]);
 
   async function fetchCustomers() {
     setLoading(true);
-    let query = supabase.from('customers').select('*').order('created_at', { ascending: false });
+    setError(null);
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    const { data } = await query;
-    if (data) setCustomers(data);
-    setLoading(false);
+      if (error) throw error;
+      setCustomers(data || []);
+    } catch (err: any) {
+      setError(err.message || 'Failed to connect to database');
+    } finally {
+      setLoading(false);
+    }
   }
 
-  const filteredCustomers = customers.filter(c => {
-    const matchesSearch = 
-      c.name.toLowerCase().includes(search.toLowerCase()) || 
-      c.project_id.toLowerCase().includes(search.toLowerCase()) ||
-      c.address.toLowerCase().includes(search.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  });
+  const filteredCustomers = useMemo(() => {
+    return customers.filter(c => {
+      const searchStr = search.toLowerCase();
+      const matchesSearch = 
+        c.name.toLowerCase().includes(searchStr) || 
+        c.project_id.toLowerCase().includes(searchStr) ||
+        (c.address && c.address.toLowerCase().includes(searchStr)) ||
+        (c.district && c.district.toLowerCase().includes(searchStr));
+      
+      const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
+      
+      return matchesSearch && matchesStatus;
+    });
+  }, [customers, search, statusFilter]);
 
   const handleUpdateStatus = async (id: string, status: ProjectStatus) => {
-    const { error } = await supabase
-      .from('customers')
-      .update({ status })
-      .eq('id', id);
+    const originalCustomers = [...customers];
+    setCustomers(prev => prev.map(c => c.id === id ? { ...c, status } : c));
 
-    if (error) {
-      alert('Error updating status: ' + error.message);
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .update({ status })
+        .eq('id', id);
+
+      if (error) throw error;
+    } catch (err: any) {
+      setCustomers(originalCustomers);
+      alert('Failed to update status: ' + err.message);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Permanently delete this project?')) return;
+
+    const originalCustomers = [...customers];
+    setCustomers(prev => prev.filter(c => c.id !== id));
+
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    } catch (err: any) {
+      setCustomers(originalCustomers);
+      alert('Delete failed: ' + err.message);
+    }
+  };
+
+  const handleDownloadPDF = async (customer: Customer) => {
+    try {
+      // Create a mock proposal object from customer data
+      const proposal = {
+        daily_output_min: Math.floor(customer.system_kw * 3.8),
+        daily_output_max: Math.ceil(customer.system_kw * 4.2),
+      };
+      await generateProposalPDF(customer, proposal);
+    } catch (err) {
+      alert('Error generating PDF');
     }
   };
 
   const statusColors = {
     completed: "bg-green-100 text-green-700 border-green-200",
-    pending: "bg-blue-100 text-blue-700 border-blue-200",
-    quoted: "bg-blue-100 text-blue-700 border-blue-200",
-    cancelled: "bg-gray-100 text-gray-700 border-gray-200",
+    pending: "bg-amber-100 text-amber-700 border-amber-200",
+    quoted: "bg-blue-100 text-[#0B07D7] border-blue-200",
+    cancelled: "bg-rose-100 text-rose-700 border-rose-200",
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 pb-24 md:pb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Customer Management</h1>
-          <p className="text-gray-500 text-sm">View and manage all solar installation projects.</p>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Customer Management</h1>
+          <p className="text-gray-500 text-sm">Real-time solar project tracking and management.</p>
         </div>
+        <button 
+          onClick={fetchCustomers}
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:shadow-md transition-all active:scale-95"
+        >
+          <RefreshCcw className={cn("w-4 h-4", loading && "animate-spin")} />
+          Sync
+        </button>
       </div>
 
-      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
-        <div className="relative w-full md:w-96">
-          <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-            <Search className="w-4 h-4" />
-          </span>
+      {error && (
+        <div className="bg-rose-50 border border-rose-100 p-4 rounded-xl flex items-center gap-3 text-rose-700">
+          <AlertCircle className="w-5 h-5" />
+          <p className="text-sm font-semibold">{error}</p>
+        </div>
+      )}
+
+      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 items-center sticky top-2 z-10">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by name, PID, or location..."
+            placeholder="Search by name, ID, or district..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-1 focus:ring-[#0047FF] focus:border-[#0047FF] text-sm"
+            className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 focus:border-[#0B07D7] outline-none transition-all text-sm"
           />
         </div>
-
         <div className="flex items-center gap-2 w-full md:w-auto">
-          <Filter className="w-4 h-4 text-gray-400 mr-2" />
+          <Filter className="w-4 h-4 text-gray-400" />
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="block w-full md:w-48 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-1 focus:ring-[#0047FF] text-sm"
+            className="flex-1 md:w-44 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#0B07D7]/20 text-sm font-bold text-gray-700"
           >
-            <option value="all">All Statuses</option>
-            {STATUS_OPTIONS.map(status => (
-              <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
+            <option value="all">All Projects</option>
+            {STATUS_OPTIONS.map(s => (
+              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
             ))}
           </select>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        {/* Table View (Desktop/Tablet) */}
-        <div className="overflow-x-auto hidden md:block">
-          <table className="w-full text-left">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        {/* Desktop Table */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-gray-50 text-gray-500 text-[10px] uppercase tracking-widest border-b border-gray-100">
-                <th className="px-6 py-4 font-black">Project ID</th>
-                <th className="px-6 py-4 font-black">Customer</th>
-                <th className="px-6 py-4 font-black">System</th>
-                <th className="px-6 py-4 font-black">Net Amount</th>
-                <th className="px-6 py-4 font-black">Status</th>
-                <th className="px-6 py-4 font-black text-right">Actions</th>
+              <tr className="bg-gray-50/50 text-gray-400 text-[10px] font-black uppercase tracking-widest border-b border-gray-100">
+                <th className="px-6 py-4">ID</th>
+                <th className="px-6 py-4">Client</th>
+                <th className="px-6 py-4">System Details</th>
+                <th className="px-6 py-4 text-right">Investment</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {loading && filteredCustomers.length === 0 ? (
+              {loading && customers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
-                    <Loader2 className="w-8 h-8 animate-spin text-[#0047FF] mx-auto" />
+                  <td colSpan={6} className="px-6 py-20 text-center">
+                    <Loader2 className="w-10 h-10 animate-spin text-[#0B07D7] mx-auto mb-3" />
+                    <span className="text-sm font-bold text-gray-400">Fetching Project Data...</span>
                   </td>
                 </tr>
               ) : filteredCustomers.length > 0 ? (
-                filteredCustomers.map((customer) => (
-                  <tr key={customer.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="px-6 py-4 font-bold text-[#0047FF]">{customer.project_id}</td>
-                    <td className="px-6 py-4">
+                filteredCustomers.map((c) => (
+                  <tr key={c.id} className="hover:bg-gray-50/50 transition-colors group">
+                    <td className="px-6 py-5">
+                      <span className="text-xs font-black text-[#0B07D7] bg-blue-50 px-2 py-1 rounded-md">{c.project_id}</span>
+                    </td>
+                    <td className="px-6 py-5">
                       <div className="flex flex-col">
-                        <span className="text-sm font-bold text-gray-900">{customer.name}</span>
-                        <span className="text-xs text-gray-500 flex items-center gap-1">
-                          <MapPin className="w-3 h-3" /> {customer.address}, {customer.district}
-                        </span>
+                        <span className="text-sm font-bold text-gray-900">{c.name}</span>
+                        <span className="text-[11px] text-gray-500 font-medium">{c.district}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-5">
                       <div className="flex flex-col">
-                        <span className="text-sm font-medium text-gray-900">{customer.system_kw} KW</span>
-                        <span className="text-[10px] text-gray-400 uppercase font-bold">{customer.panel_brand}</span>
+                        <span className="text-sm font-bold text-gray-700">{c.system_kw} KW</span>
+                        <span className="text-[10px] text-gray-400 font-black uppercase">{c.panel_brand}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm font-black text-gray-900">{formatCurrency(customer.net_cost)}</span>
+                    <td className="px-6 py-5 text-right">
+                      <span className="text-sm font-black text-gray-900">{formatCurrency(c.net_cost)}</span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-5">
                       <select
-                        value={customer.status}
-                        onChange={(e) => handleUpdateStatus(customer.id, e.target.value as ProjectStatus)}
+                        value={c.status}
+                        onChange={(e) => handleUpdateStatus(c.id, e.target.value as ProjectStatus)}
                         className={cn(
-                          "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border outline-none transition-all cursor-pointer",
-                          statusColors[customer.status as keyof typeof statusColors]
+                          "px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 outline-none transition-all cursor-pointer shadow-sm",
+                          statusColors[c.status]
                         )}
                       >
-                        {STATUS_OPTIONS.map(s => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
+                        {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button title="View Details" className="p-2 text-gray-400 hover:text-[#0047FF] hover:bg-blue-50 rounded-lg transition-colors">
-                          <Eye className="w-4 h-4" />
+                    <td className="px-6 py-5 text-right">
+                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                        <button 
+                          onClick={() => handleDownloadPDF(c)}
+                          className="p-2 text-gray-400 hover:text-[#0B07D7] hover:bg-blue-50 rounded-xl"
+                        >
+                          <Download className="w-4 h-4" />
                         </button>
-                        <button title="Edit" className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                          <Edit3 className="w-4 h-4" />
+                        <button 
+                          onClick={() => handleDelete(c.id)}
+                          className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
@@ -195,11 +272,8 @@ export default function CustomersPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-6 py-20 text-center text-gray-500">
-                    <div className="flex flex-col items-center gap-2">
-                      <AlertCircle className="w-8 h-8 text-gray-300" />
-                      <p className="font-medium text-gray-400">No customers found matching your criteria.</p>
-                    </div>
+                  <td colSpan={6} className="px-6 py-20 text-center text-gray-400 font-bold">
+                    No results found.
                   </td>
                 </tr>
               )}
@@ -207,85 +281,59 @@ export default function CustomersPage() {
           </table>
         </div>
 
-        {/* Card View (Mobile) */}
-        <div className="grid grid-cols-1 divide-y divide-gray-100 md:hidden">
-          {loading && filteredCustomers.length === 0 ? (
-            <div className="p-12 text-center">
-              <Loader2 className="w-8 h-8 animate-spin text-[#0047FF] mx-auto" />
-            </div>
-          ) : filteredCustomers.length > 0 ? (
-            filteredCustomers.map((customer) => (
-              <div key={customer.id} className="p-5 space-y-4 active:bg-gray-50 transition-colors">
-                <div className="flex justify-between items-start">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-[#0047FF] uppercase tracking-widest">{customer.project_id}</span>
-                    <h4 className="text-base font-bold text-gray-900 mt-1">{customer.name}</h4>
-                  </div>
-                  <div className={cn(
-                    "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border",
-                    statusColors[customer.status as keyof typeof statusColors]
-                  )}>
-                    {customer.status}
-                  </div>
+        {/* Mobile Cards */}
+        <div className="md:hidden divide-y divide-gray-100">
+          {filteredCustomers.map((c) => (
+            <div key={c.id} className="p-5 space-y-4 active:bg-gray-50 transition-colors">
+              <div className="flex justify-between items-start">
+                <div>
+                  <span className="text-[10px] font-black text-[#0B07D7] bg-blue-50 px-2 py-0.5 rounded uppercase tracking-widest">{c.project_id}</span>
+                  <h4 className="text-lg font-bold text-gray-900 mt-2">{c.name}</h4>
+                  <p className="text-xs text-gray-500 font-medium flex items-center gap-1">
+                    <MapPin className="w-3 h-3" /> {c.district}
+                  </p>
                 </div>
+                <select
+                  value={c.status}
+                  onChange={(e) => handleUpdateStatus(c.id, e.target.value as ProjectStatus)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 outline-none transition-all shadow-sm",
+                    statusColors[c.status]
+                  )}
+                >
+                  {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] text-gray-400 font-bold uppercase">System Size</span>
-                    <span className="text-sm font-bold text-gray-700">{customer.system_kw} KW</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] text-gray-400 font-bold uppercase">Net Amount</span>
-                    <span className="text-sm font-black text-gray-900">{formatCurrency(customer.net_cost)}</span>
-                  </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                  <p className="text-[9px] text-gray-400 font-black uppercase mb-1">Capacity</p>
+                  <p className="text-sm font-bold text-gray-800">{c.system_kw} KW</p>
                 </div>
-
-                <div className="flex items-center gap-1 text-xs text-gray-500">
-                  <MapPin className="w-3 h-3" />
-                  <span className="truncate">{customer.address}, {customer.district}</span>
-                </div>
-
-                <div className="flex items-center justify-between pt-2">
-                   <div className="flex gap-2">
-                    <button className="p-2 text-gray-400 border border-gray-200 rounded-lg hover:text-[#0047FF] hover:bg-blue-50 transition-colors">
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    <button className="p-2 text-gray-400 border border-gray-200 rounded-lg hover:text-blue-600 hover:bg-blue-50 transition-colors">
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                   </div>
-                   <select
-                    value={customer.status}
-                    onChange={(e) => handleUpdateStatus(customer.id, e.target.value as ProjectStatus)}
-                    className="text-xs font-bold bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-[#0047FF]"
-                   >
-                    {STATUS_OPTIONS.map(s => (
-                      <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-                    ))}
-                   </select>
+                <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                  <p className="text-[9px] text-gray-400 font-black uppercase mb-1">Net Investment</p>
+                  <p className="text-sm font-black text-gray-900">{formatCurrency(c.net_cost)}</p>
                 </div>
               </div>
-            ))
-          ) : (
-            <div className="p-20 text-center text-gray-500">
-              <AlertCircle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-              <p className="font-medium text-gray-400">No customers found.</p>
+
+              <div className="flex items-center justify-between gap-3 pt-2">
+                <button 
+                  onClick={() => handleDownloadPDF(c)}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#0B07D7] text-white text-xs font-black rounded-2xl shadow-lg shadow-blue-200 active:scale-95 transition-all"
+                >
+                  <Download className="w-4 h-4" /> DOWNLOAD PROPOSAL
+                </button>
+                <button 
+                  onClick={() => handleDelete(c.id)}
+                  className="p-3 bg-rose-50 text-rose-600 rounded-2xl active:scale-95 transition-all"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              </div>
             </div>
-          )}
+          ))}
         </div>
       </div>
-        
-        <div className="p-4 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
-          <p>Showing {filteredCustomers.length} customers</p>
-          <div className="flex gap-2">
-            <button disabled className="p-2 border border-gray-200 rounded-lg disabled:opacity-30">
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button disabled className="p-2 border border-gray-200 rounded-lg disabled:opacity-30">
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
+    </div>
   );
 }
