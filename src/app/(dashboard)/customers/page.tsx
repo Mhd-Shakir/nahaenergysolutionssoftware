@@ -48,7 +48,7 @@ export default function CustomersPage() {
           } else if (payload.eventType === 'UPDATE') {
             setCustomers(prev => prev.map(c => c.id === payload.new.id ? payload.new as Customer : c));
           } else if (payload.eventType === 'DELETE') {
-            setCustomers(prev => prev.filter(c => c.id === payload.old.id));
+            setCustomers(prev => prev.filter(c => c.id !== payload.old.id));
           }
         }
       )
@@ -116,6 +116,23 @@ export default function CustomersPage() {
     setCustomers(prev => prev.filter(c => c.id !== id));
 
     try {
+      // 1. Delete associated sales records
+      const { error: salesError } = await supabase
+        .from('sales')
+        .delete()
+        .eq('customer_id', id);
+
+      if (salesError) throw salesError;
+
+      // 2. Delete associated proposals records
+      const { error: proposalsError } = await supabase
+        .from('proposals')
+        .delete()
+        .eq('customer_id', id);
+
+      if (proposalsError) throw proposalsError;
+
+      // 3. Delete the customer
       const { error } = await supabase
         .from('customers')
         .delete()

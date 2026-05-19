@@ -97,7 +97,8 @@ export default function NewProposalPage() {
     setIsSubmitting(true);
     
     try {
-      const amount = parseFloat(data.totalProjectCost.replace(/[^0-9.]/g, '')) || 0;
+      const costString = String(data.totalProjectCost || '');
+      const amount = parseFloat(costString.replace(/[^0-9.]/g, '')) || 0;
       const kw = parseFloat(data.products.find(p => p.name.includes('Module'))?.quantity || '0') || 0;
 
       // 1. Create/Update Customer entry
@@ -115,6 +116,7 @@ export default function NewProposalPage() {
           subsidy: 0, // Default to 0, can be updated later
           net_cost: amount,
           status: 'quoted',
+          type: 'residential', // Defaulting to residential to meet schema constraints
           district: data.provinceState || 'Kerala',
         })
         .select()
@@ -133,6 +135,27 @@ export default function NewProposalPage() {
         });
 
       if (saleError) throw saleError;
+
+      // 3. Record as a Proposal in the database
+      const { error: proposalError } = await supabase
+        .from('proposals')
+        .insert({
+          proposal_number: data.projectId || `PJ-${Math.floor(Math.random() * 10000)}`,
+          customer_id: customer.id,
+          system_kw: kw,
+          panel_brand: data.products.find(p => p.name.includes('Module'))?.brand || 'Standard',
+          inverter_brand: data.products.find(p => p.name.includes('Inverter'))?.brand || 'Standard',
+          actual_cost: amount,
+          subsidy: 0,
+          net_cost: amount,
+          daily_output_min: Math.floor(kw * 3.8),
+          daily_output_max: Math.ceil(kw * 4.2),
+          notes: data.remarks || '',
+          sent_at: new Date().toISOString(),
+          valid_until: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
+        });
+
+      if (proposalError) throw proposalError;
 
       alert('Proposal submitted and revenue recorded!');
       router.push('/customers');
