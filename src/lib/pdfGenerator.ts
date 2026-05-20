@@ -26,53 +26,47 @@ export async function generateProposalPDF(customer: Partial<Customer>, proposal:
     });
   };
 
-  let logoImg: HTMLImageElement | null = null;
-  let footerImg: HTMLImageElement | null = null;
+  let bannerImg: HTMLImageElement | null = null;
 
   try {
-    logoImg = await loadImage('/backround-blue-white-logo.png');
+    bannerImg = await loadImage('/solar-footer.png');
   } catch (e) {
-    console.error('Logo failed to load', e);
+    console.warn('Banner image failed to load', e);
   }
 
-  try {
-    footerImg = await loadImage('/solar-footer.jpeg');
-  } catch (e) {
-    console.error('Footer image failed to load', e);
-  }
+  // Calculate dynamic aspect ratios to prevent squishing / congestion
+  const imageRatio = bannerImg ? (bannerImg.height / bannerImg.width) : (350 / 1000);
+  const headerHeight = pageWidth * imageRatio;
+
+  // Clean page-bottom layouts without footer image
+  const lineY = pageHeight - 20; // divider line 20mm from page bottom
+  const pageNumY = lineY + 4; // page num 4mm below divider line
+  
+  // Set table bottom margin to a standard clean buffer
+  const tableBottomMargin = 25;
 
   try {
-    // 1. Vector Blue Bar
-    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.rect(0, 0, pageWidth, 35, 'F');
-
-    if (logoImg) {
-      // 2. Proportional Logo
-      const ratio = logoImg.height / logoImg.width;
-      const displayWidth = 70;
-      const displayHeight = displayWidth * ratio;
-      const x = (pageWidth - displayWidth) / 2;
-      const y = (35 - displayHeight) / 2;
-
-      doc.addImage(logoImg, 'PNG', x, y, displayWidth, displayHeight);
+    if (bannerImg) {
+      // Draw banner image at the top of the first page edge-to-edge
+      doc.addImage(bannerImg, 'PNG', 0, 0, pageWidth, headerHeight);
     }
   } catch (e) {
     console.error('Header drawing failed', e);
   }
 
-  // Company Name (Below Blue Bar)
+  // Company Name (Below Banner - dynamically positioned!)
   doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text('NAHA ENERGY SOLUTIONS', margin, 50);
+  doc.text('NAHA ENERGY SOLUTIONS', margin, headerHeight + 10);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100);
-  doc.text('MNRE Approved | KSEB Grid Connect System | Kerala', margin, 56);
+  doc.text('MNRE Approved | KSEB Grid Connect System | Kerala', margin, headerHeight + 16);
 
-  // Customer & Project Info
+  // Customer & Project Info (dynamically positioned!)
   autoTable(doc, {
-    startY: 65,
+    startY: headerHeight + 25,
     head: [['Customer Details', 'Project Overview']],
     body: [
       [`Name: ${customer.name}`, `Project ID: ${customer.project_id}`],
@@ -80,7 +74,7 @@ export async function generateProposalPDF(customer: Partial<Customer>, proposal:
       [`Phone: ${customer.phone}`, `System Capacity: ${customer.system_kw} KW`],
     ],
     theme: 'plain',
-    margin: { bottom: 50 },
+    margin: { bottom: tableBottomMargin },
     styles: { fontSize: 9, cellPadding: 3, font: 'helvetica' },
     headStyles: { fillColor: [248, 249, 254], textColor: primaryColor, fontStyle: 'bold' },
     columnStyles: { 0: { cellWidth: 90 }, 1: { cellWidth: 80 } }
@@ -113,7 +107,7 @@ export async function generateProposalPDF(customer: Partial<Customer>, proposal:
       ['Cables', 'Solar DC 4/6mm & AC Armoured', '10 Year', 'Req'],
     ],
     styles: { fontSize: 8.5, cellPadding: 4.5, font: 'helvetica' },
-    margin: { bottom: 50 },
+    margin: { bottom: tableBottomMargin },
     headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], halign: 'left' },
     alternateRowStyles: { fillColor: [252, 252, 255] },
     columnStyles: { 0: { fontStyle: 'bold' }, 2: { halign: 'center' }, 3: { halign: 'center' } }
@@ -130,7 +124,7 @@ export async function generateProposalPDF(customer: Partial<Customer>, proposal:
       ['Net Cost to Customer', { content: formatPDFCurrency(customer.net_cost || 0), styles: { fontStyle: 'bold', fontSize: 14 } }],
     ],
     theme: 'grid',
-    margin: { bottom: 50 },
+    margin: { bottom: tableBottomMargin },
     styles: { fontSize: 9.5, cellPadding: 5 },
     columnStyles: {
       0: { cellWidth: 100, fontStyle: 'bold', fillColor: [250, 250, 250] },
@@ -177,24 +171,12 @@ export async function generateProposalPDF(customer: Partial<Customer>, proposal:
     // Page border line
     doc.setDrawColor(220, 220, 220);
     doc.setLineWidth(0.5);
-    doc.line(margin, pageHeight - 48, pageWidth - margin, pageHeight - 48);
-
-    // Banner image at bottom (centered)
-    if (footerImg) {
-      try {
-        const bannerW = pageWidth - 2 * margin; // 170mm
-        const bannerH = 35; // clean height
-        const bannerY = pageHeight - 42;
-        doc.addImage(footerImg, 'PNG', margin, bannerY, bannerW, bannerH);
-      } catch (e) {
-        console.error('Footer image failed to add', e);
-      }
-    }
+    doc.line(margin, lineY, pageWidth - margin, lineY);
 
     doc.setFontSize(8);
     doc.setTextColor(150);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 44, { align: 'right' });
+    doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageNumY, { align: 'right' });
   }
 
   doc.save(`${(customer.name || 'Proposal').replace(/\s+/g, '_')}.pdf`);
