@@ -176,6 +176,7 @@ export async function generateProposalPDF(customer: Partial<Customer>, proposal:
     doc.setFontSize(8);
     doc.setTextColor(150);
     doc.setFont('helvetica', 'normal');
+    doc.text('Nahaenergysolutions | www.nahaenergysolutions.com', margin, pageNumY);
     doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageNumY, { align: 'right' });
   }
 

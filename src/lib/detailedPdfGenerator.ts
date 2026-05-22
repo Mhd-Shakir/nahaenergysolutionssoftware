@@ -4,7 +4,7 @@ import autoTable from 'jspdf-autotable';
 export interface DetailedProposalData {
   // Section 1 - Client Info
   clientName: string;
-  designation: string;
+  clientType: 'residential' | 'commercial';
   address: string;
   mobileNumber: string;
   date: string;
@@ -31,6 +31,8 @@ export interface DetailedProposalData {
 
   // Section 4 - Cost Details
   totalProjectCost: string;
+  advancePaid?: string;
+  balanceAmount?: string;
   avgDailyEnergy: string;
   avgOutputPerKw: string;
   requiredAreaPerKw: string;
@@ -150,7 +152,7 @@ export async function generateDetailedProposalPDF(data: DetailedProposalData) {
     startY: currentY,
     body: [
       ['Client Name', data.clientName, 'Date', data.date],
-      ['Designation', data.designation, 'Project ID', data.projectId],
+      ['Client Type', data.clientType === 'commercial' ? 'Commercial' : 'Residential', 'Project ID', data.projectId],
       ['Address', data.address, 'Coordinates', data.locationCoordinates],
       ['Mobile', data.mobileNumber, '', ''],
     ],
@@ -199,17 +201,25 @@ export async function generateDetailedProposalPDF(data: DetailedProposalData) {
   const parsedCost = parseFloat(data.totalProjectCost.replace(/[^0-9.]/g, '')) || 0;
   const formattedCost = 'Rs. ' + new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(parsedCost);
 
+  const parsedAdvance = parseFloat((data.advancePaid || '').replace(/[^0-9.]/g, '')) || 0;
+  const formattedAdvance = 'Rs. ' + new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(parsedAdvance);
+
+  const parsedBalance = parseFloat((data.balanceAmount || '').replace(/[^0-9.]/g, '')) || (parsedCost - parsedAdvance);
+  const formattedBalance = 'Rs. ' + new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(parsedBalance);
+
   autoTable(doc, {
     startY: currentY,
     body: [
-      ['Total Project Cost', { content: formattedCost, styles: { fontStyle: 'bold', fontSize: 15, textColor: primaryColor } }],
+      ['Total Project Cost', { content: formattedCost, styles: { fontStyle: 'bold', fontSize: 13, textColor: primaryColor } }],
+      ['Advance Paid', { content: formattedAdvance, styles: { fontStyle: 'normal', fontSize: 11 } }],
+      ['Balance Amount', { content: formattedBalance, styles: { fontStyle: 'bold', fontSize: 12, textColor: [180, 0, 0] } }],
     ],
     theme: 'grid',
     margin: { bottom: tableBottomMargin },
     styles: { fontSize: 11, cellPadding: 8, font: 'helvetica' },
     columnStyles: {
       0: { fontStyle: 'bold', cellWidth: 120, fillColor: [240, 244, 255] },
-      1: { halign: 'right', fontStyle: 'bold', textColor: primaryColor, fontSize: 15 }
+      1: { halign: 'right', fontStyle: 'bold', textColor: primaryColor, fontSize: 13 }
     }
   });
 
@@ -284,6 +294,7 @@ export async function generateDetailedProposalPDF(data: DetailedProposalData) {
     doc.setFontSize(8);
     doc.setTextColor(150);
     doc.setFont('helvetica', 'normal');
+    doc.text('Nahaenergysolutions | www.nahaenergysolutions.com', margin, pageNumY);
     doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageNumY, { align: 'right' });
   }
 

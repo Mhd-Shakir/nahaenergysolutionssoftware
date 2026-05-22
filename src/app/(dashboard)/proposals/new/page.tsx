@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { 
   FileDown, 
@@ -46,10 +46,10 @@ const DEFAULT_PRODUCTS = [
 export default function NewProposalPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { register, control, handleSubmit, formState: { errors } } = useForm<DetailedProposalData>({
+  const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<DetailedProposalData>({
     defaultValues: {
       clientName: '',
-      designation: '',
+      clientType: 'residential',
       address: '',
       mobileNumber: '',
       date: new Date().toISOString().split('T')[0],
@@ -64,6 +64,8 @@ export default function NewProposalPage() {
       contactNumber: '+91 80891 35003',
       products: DEFAULT_PRODUCTS,
       totalProjectCost: '',
+      advancePaid: '',
+      balanceAmount: '',
       avgDailyEnergy: '',
       avgOutputPerKw: '',
       requiredAreaPerKw: '',
@@ -85,6 +87,15 @@ export default function NewProposalPage() {
     control,
     name: "products"
   });
+
+  const totalCostVal = watch('totalProjectCost');
+  const advanceVal = watch('advancePaid');
+
+  useEffect(() => {
+    const cost = parseFloat(totalCostVal || '') || 0;
+    const adv = parseFloat(advanceVal || '') || 0;
+    setValue('balanceAmount', String(cost - adv));
+  }, [totalCostVal, advanceVal, setValue]);
 
   const onDownloadPDF = async (data: DetailedProposalData) => {
     await generateDetailedProposalPDF(data);
@@ -116,7 +127,7 @@ export default function NewProposalPage() {
           subsidy: 0, // Default to 0, can be updated later
           net_cost: amount,
           status: 'quoted',
-          type: 'residential', // Defaulting to residential to meet schema constraints
+          type: data.clientType || 'residential', // Use the selected client type from dropdown!
           district: data.provinceState || 'Kerala',
         })
         .select()
@@ -200,8 +211,14 @@ export default function NewProposalPage() {
               <input {...register('clientName', { required: true })} className={cn("input-field", errors.clientName && "error")} placeholder="Client name" />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-700">Designation</label>
-              <input {...register('designation', { required: true })} className={cn("input-field", errors.designation && "error")} placeholder="Designation" />
+              <label className="text-sm font-bold text-gray-700">Client Type</label>
+              <select 
+                {...register('clientType', { required: true })} 
+                className={cn("input-field bg-white outline-none border-2 border-gray-100 focus:border-[#0B07D7]", errors.clientType && "error")}
+              >
+                <option value="residential">Residential</option>
+                <option value="commercial">Commercial</option>
+              </select>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Mobile Number</label>
@@ -294,7 +311,19 @@ export default function NewProposalPage() {
                       <input {...register(`products.${index}.warranty`, { required: true })} className={cn("table-input", errors.products?.[index]?.warranty && "error")} placeholder="Warranty" />
                     </td>
                     <td className="px-8 py-3">
-                      <input {...register(`products.${index}.quantity`, { required: true })} className={cn("table-input", errors.products?.[index]?.quantity && "error")} placeholder="Quantity" />
+                      {field.name === 'Solar Module' ? (
+                        <select 
+                          {...register(`products.${index}.quantity`, { required: true })} 
+                          className={cn("table-input bg-white outline-none border-b border-gray-200 focus:border-[#0B07D7]", errors.products?.[index]?.quantity && "error")}
+                        >
+                          <option value="10 KW">10 KW</option>
+                          <option value="Hybrid">Hybrid</option>
+                          <option value="5 KW">5 KW</option>
+                          <option value="3 KW">3 KW</option>
+                        </select>
+                      ) : (
+                        <input {...register(`products.${index}.quantity`, { required: true })} className={cn("table-input", errors.products?.[index]?.quantity && "error")} placeholder="Quantity" />
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -310,6 +339,20 @@ export default function NewProposalPage() {
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Total Project Cost</label>
               <input type="number" {...register('totalProjectCost', { required: true })} className={cn("input-field", errors.totalProjectCost && "error")} placeholder="Enter amount" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-gray-700">Advance Paid</label>
+              <input type="number" {...register('advancePaid')} className={cn("input-field", errors.advancePaid && "error")} placeholder="Enter advance paid" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-gray-700">Balance Amount</label>
+              <input 
+                type="number" 
+                {...register('balanceAmount')} 
+                readOnly 
+                className="input-field bg-gray-50 border-gray-200 cursor-not-allowed text-gray-500 font-bold" 
+                placeholder="Auto-calculated balance" 
+              />
             </div>
           </div>
         </div>
