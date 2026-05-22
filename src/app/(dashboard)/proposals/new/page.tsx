@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { generateDetailedProposalPDF, DetailedProposalData } from '@/lib/detailedPdfGenerator';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/Toast';
 
 const DEFAULT_PRODUCTS = [
   { name: 'Solar Module', brand: 'RAYZON, WAAREE, ADANI, RENEW', specification: 'Half cut mono perc bifacial - DCR Panels', warranty: '30 Year', quantity: '10 KW' },
@@ -45,6 +46,7 @@ const DEFAULT_PRODUCTS = [
 
 export default function NewProposalPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const toast = useToast();
 
   const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<DetailedProposalData>({
     defaultValues: {
@@ -168,11 +170,11 @@ export default function NewProposalPage() {
 
       if (proposalError) throw proposalError;
 
-      alert('Proposal submitted and revenue recorded!');
+      toast.success('Proposal submitted and revenue recorded!');
       router.push('/customers');
     } catch (err: any) {
       console.error('Submission Error:', err);
-      alert('Error saving proposal: ' + err.message);
+      toast.error('Error saving proposal: ' + err.message);
     } finally {
       setIsSubmitting(false);
     }

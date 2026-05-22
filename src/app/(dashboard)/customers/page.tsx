@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/components/Toast';
 import { Customer, ProjectStatus } from '@/types';
 import { formatCurrency } from '@/lib/subsidyCalc';
 import { generateProposalPDF } from '@/lib/pdfGenerator';
@@ -31,6 +32,8 @@ export default function CustomersPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'all'>('all');
   const [error, setError] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const toast = useToast();
   
   const supabase = useMemo(() => createClient(), []);
 
@@ -103,15 +106,14 @@ export default function CustomersPage() {
         .eq('id', id);
 
       if (error) throw error;
+      toast.success('Project status updated!');
     } catch (err: any) {
       setCustomers(originalCustomers);
-      alert('Failed to update status: ' + err.message);
+      toast.error('Failed to update status: ' + err.message);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Permanently delete this project?')) return;
-
     const originalCustomers = [...customers];
     setCustomers(prev => prev.filter(c => c.id !== id));
 
@@ -139,9 +141,10 @@ export default function CustomersPage() {
         .eq('id', id);
 
       if (error) throw error;
+      toast.success('Project successfully deleted!');
     } catch (err: any) {
       setCustomers(originalCustomers);
-      alert('Delete failed: ' + err.message);
+      toast.error('Delete failed: ' + err.message);
     }
   };
 
@@ -153,8 +156,9 @@ export default function CustomersPage() {
         daily_output_max: Math.ceil(customer.system_kw * 4.2),
       };
       await generateProposalPDF(customer, proposal);
+      toast.success('PDF downloaded successfully!');
     } catch (err) {
-      alert('Error generating PDF');
+      toast.error('Error generating PDF');
     }
   };
 
@@ -278,7 +282,7 @@ export default function CustomersPage() {
                           <Download className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => handleDelete(c.id)}
+                          onClick={() => setDeleteConfirmId(c.id)}
                           className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -341,7 +345,7 @@ export default function CustomersPage() {
                   <Download className="w-4 h-4" /> DOWNLOAD PROPOSAL
                 </button>
                 <button 
-                  onClick={() => handleDelete(c.id)}
+                  onClick={() => setDeleteConfirmId(c.id)}
                   className="p-3 bg-rose-50 text-rose-600 rounded-2xl active:scale-95 transition-all"
                 >
                   <Trash2 className="w-5 h-5" />
@@ -351,6 +355,69 @@ export default function CustomersPage() {
           ))}
         </div>
       </div>
+
+      {/* Modern Confirmation Modal Overlay */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setDeleteConfirmId(null)}
+          />
+          
+          {/* Modal Content */}
+          <div className="relative bg-white rounded-3xl border border-gray-100 shadow-2xl p-6 md:p-8 max-w-sm w-full text-center space-y-6 animate-scale-up z-10">
+            <div className="mx-auto w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500">
+              <Trash2 className="w-8 h-8" />
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-gray-900">Are you sure?</h3>
+              <p className="text-gray-500 text-sm font-medium leading-relaxed">
+                This action is permanent and cannot be undone. All associated sales and proposals for this project will be deleted.
+              </p>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmId(null)}
+                className="flex-1 py-3.5 bg-gray-50 text-gray-700 font-bold rounded-2xl border border-gray-200/50 hover:bg-gray-100 active:scale-95 transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleDelete(deleteConfirmId);
+                  setDeleteConfirmId(null);
+                }}
+                className="flex-1 py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-2xl shadow-lg shadow-rose-200 active:scale-95 transition-all cursor-pointer"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal animation helper styles */}
+      <style jsx global>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scaleUp {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        .animate-fade-in {
+          animation: fadeIn 0.2s ease-out forwards;
+        }
+        .animate-scale-up {
+          animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}</style>
     </div>
   );
 }
