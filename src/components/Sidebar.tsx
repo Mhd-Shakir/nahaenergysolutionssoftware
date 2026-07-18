@@ -10,7 +10,8 @@ import {
   BarChart3, 
   LogOut,
   Zap,
-  Plus
+  Plus,
+  FileText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
@@ -20,6 +21,7 @@ const menuItems = [
   { label: 'Dashboard', href: '/', icon: LayoutDashboard },
   { label: 'New Proposal', href: '/proposals/new', icon: FilePlus },
   { label: 'Customers', href: '/customers', icon: Users },
+  { label: 'Invoices', href: '/invoices', icon: FileText },
   { label: 'Subsidy Calculator', href: '/subsidy', icon: Calculator },
   { label: 'Analytics', href: '/analytics', icon: BarChart3 },
 ];

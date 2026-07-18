@@ -7,7 +7,8 @@ import {
   FilePlus, 
   Users, 
   Calculator, 
-  BarChart3 
+  BarChart3,
+  FileText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -15,6 +16,7 @@ const menuItems = [
   { label: 'Home', href: '/', icon: LayoutDashboard },
   { label: 'Propose', href: '/proposals/new', icon: FilePlus },
   { label: 'Clients', href: '/customers', icon: Users },
+  { label: 'Invoices', href: '/invoices', icon: FileText },
   { label: 'Subsidy', href: '/subsidy', icon: Calculator },
   { label: 'Stats', href: '/analytics', icon: BarChart3 },
 ];

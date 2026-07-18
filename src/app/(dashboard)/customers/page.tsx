@@ -20,9 +20,12 @@ import {
   Clock,
   FileText,
   Download,
-  ExternalLink
+  ExternalLink,
+  Edit,
+  Receipt
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 const STATUS_OPTIONS: ProjectStatus[] = ['quoted', 'pending', 'completed', 'cancelled'];
 
@@ -33,7 +36,11 @@ export default function CustomersPage() {
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'all'>('all');
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState<string | null>(null);
   const toast = useToast();
+  const router = useRouter();
   
   const supabase = useMemo(() => createClient(), []);
 
@@ -113,6 +120,40 @@ export default function CustomersPage() {
     }
   };
 
+  const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingCustomer) return;
+    
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .update({
+          name: editingCustomer.name,
+          phone: editingCustomer.phone,
+          address: editingCustomer.address,
+          district: editingCustomer.district,
+          system_kw: editingCustomer.system_kw,
+          panel_brand: editingCustomer.panel_brand,
+          inverter_brand: editingCustomer.inverter_brand,
+          actual_cost: editingCustomer.actual_cost,
+          subsidy: editingCustomer.subsidy,
+          net_cost: editingCustomer.net_cost,
+        })
+        .eq('id', editingCustomer.id);
+
+      if (error) throw error;
+
+      toast.success('Project details updated!');
+      setCustomers(prev => prev.map(c => c.id === editingCustomer.id ? editingCustomer : c));
+      setEditingCustomer(null);
+    } catch (err: any) {
+      toast.error('Failed to update project: ' + err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     const originalCustomers = [...customers];
     setCustomers(prev => prev.filter(c => c.id !== id));
@@ -159,6 +200,42 @@ export default function CustomersPage() {
       toast.success('PDF downloaded successfully!');
     } catch (err) {
       toast.error('Error generating PDF');
+    }
+  };
+
+  const handleGenerateInvoice = async (customer: Customer) => {
+    setIsGeneratingInvoice(customer.id);
+    try {
+      // Generate unique invoice number
+      const countRes = await supabase.from('invoices').select('id', { count: 'exact' });
+      const num = (countRes.count || 0) + 1;
+      const invoiceNumber = `INV-${new Date().getFullYear()}-${num.toString().padStart(4, '0')}`;
+      
+      const { data, error } = await supabase
+        .from('invoices')
+        .insert({
+          invoice_number: invoiceNumber,
+          customer_id: customer.id,
+          amount: customer.net_cost,
+          status: 'pending'
+        })
+        .select()
+        .single();
+        
+      if (error) {
+        if (error.code === '23505') {
+            toast.error('Invoice already generated. Check Invoices tab.');
+            return;
+        }
+        throw error;
+      }
+      
+      toast.success('Invoice generated successfully!');
+      router.push('/invoices');
+    } catch (err: any) {
+      toast.error('Failed to generate invoice: ' + err.message);
+    } finally {
+      setIsGeneratingInvoice(null);
     }
   };
 
@@ -276,10 +353,26 @@ export default function CustomersPage() {
                     <td className="px-6 py-5 text-right">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
                         <button 
+                          onClick={() => handleGenerateInvoice(c)}
+                          disabled={isGeneratingInvoice === c.id}
+                          className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl disabled:opacity-50"
+                          title="Generate Invoice"
+                        >
+                          {isGeneratingInvoice === c.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Receipt className="w-4 h-4" />}
+                        </button>
+                        <button 
                           onClick={() => handleDownloadPDF(c)}
                           className="p-2 text-gray-400 hover:text-[#0B07D7] hover:bg-blue-50 rounded-xl"
+                          title="Download PDF"
                         >
                           <Download className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => setEditingCustomer(c)}
+                          className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl"
+                          title="Edit Customer"
+                        >
+                          <Edit className="w-4 h-4" />
                         </button>
                         <button 
                           onClick={() => setDeleteConfirmId(c.id)}
@@ -337,12 +430,25 @@ export default function CustomersPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-3 pt-2">
+              <div className="flex items-center justify-between gap-2 pt-2">
+                <button 
+                  onClick={() => handleGenerateInvoice(c)}
+                  disabled={isGeneratingInvoice === c.id}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-50 text-emerald-600 text-xs font-black rounded-2xl active:scale-95 transition-all disabled:opacity-50"
+                >
+                  {isGeneratingInvoice === c.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Receipt className="w-4 h-4" />} INVOICE
+                </button>
                 <button 
                   onClick={() => handleDownloadPDF(c)}
                   className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#0B07D7] text-white text-xs font-black rounded-2xl shadow-lg shadow-blue-200 active:scale-95 transition-all"
                 >
-                  <Download className="w-4 h-4" /> DOWNLOAD PROPOSAL
+                  <Download className="w-4 h-4" /> PDF
+                </button>
+                <button 
+                  onClick={() => setEditingCustomer(c)}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-amber-50 text-amber-600 text-xs font-black rounded-2xl active:scale-95 transition-all"
+                >
+                  <Edit className="w-4 h-4" /> EDIT
                 </button>
                 <button 
                   onClick={() => setDeleteConfirmId(c.id)}
@@ -397,6 +503,62 @@ export default function CustomersPage() {
                 Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingCustomer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditingCustomer(null)} />
+          <div className="relative bg-white rounded-3xl border border-gray-100 shadow-2xl p-6 md:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-scale-up z-10">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-gray-900">Edit Project Details</h3>
+              <button type="button" onClick={() => setEditingCustomer(null)} className="p-2 bg-gray-50 text-gray-400 rounded-full hover:bg-gray-100"><XCircle className="w-5 h-5" /></button>
+            </div>
+            
+            <form onSubmit={handleEditSubmit} className="space-y-4 text-left">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Client Name</label>
+                  <input type="text" required value={editingCustomer.name} onChange={e => setEditingCustomer({...editingCustomer, name: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Phone</label>
+                  <input type="text" required value={editingCustomer.phone} onChange={e => setEditingCustomer({...editingCustomer, phone: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-sm" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Address</label>
+                  <input type="text" required value={editingCustomer.address} onChange={e => setEditingCustomer({...editingCustomer, address: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">District</label>
+                  <input type="text" required value={editingCustomer.district} onChange={e => setEditingCustomer({...editingCustomer, district: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">System (KW)</label>
+                  <input type="number" step="0.1" required value={editingCustomer.system_kw} onChange={e => setEditingCustomer({...editingCustomer, system_kw: parseFloat(e.target.value)})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Panel Brand</label>
+                  <input type="text" required value={editingCustomer.panel_brand} onChange={e => setEditingCustomer({...editingCustomer, panel_brand: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Inverter Brand</label>
+                  <input type="text" required value={editingCustomer.inverter_brand} onChange={e => setEditingCustomer({...editingCustomer, inverter_brand: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Net Cost (₹)</label>
+                  <input type="number" required value={editingCustomer.net_cost} onChange={e => setEditingCustomer({...editingCustomer, net_cost: parseFloat(e.target.value)})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-sm" />
+                </div>
+              </div>
+              <div className="pt-4 flex gap-3">
+                <button type="button" onClick={() => setEditingCustomer(null)} className="flex-1 py-3 bg-gray-50 text-gray-700 font-bold rounded-2xl border border-gray-200/50 hover:bg-gray-100 active:scale-95 transition-all">Cancel</button>
+                <button type="submit" disabled={isSubmitting} className="flex-1 py-3 bg-[#0B07D7] text-white font-bold rounded-2xl shadow-lg shadow-blue-200 hover:bg-blue-800 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                  {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />} Save Changes
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

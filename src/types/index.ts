@@ -55,3 +55,27 @@ export interface Product {
   inverter_type: string;
   updated_at: string;
 }
+
+export type InvoiceStatus = 'pending' | 'partial' | 'paid' | 'overdue';
+
+export interface Invoice {
+  id: string;
+  invoice_number: string;
+  customer_id: string;
+  proposal_id?: string;
+  amount: number;
+  paid_amount: number;
+  status: InvoiceStatus;
+  due_date?: string;
+  created_at: string;
+}
+
+export interface Payment {
+  id: string;
+  invoice_id: string;
+  amount: number;
+  payment_date: string;
+  payment_method: string;
+  notes?: string;
+  created_at: string;
+}
