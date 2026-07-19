@@ -151,7 +151,7 @@ export default function NewProposalPage() {
       if (saleError) throw saleError;
 
       // 3. Record as a Proposal in the database
-      const { error: proposalError } = await supabase
+      const { data: proposal, error: proposalError } = await supabase
         .from('proposals')
         .insert({
           proposal_number: data.projectId || `PJ-${Math.floor(Math.random() * 10000)}`,
@@ -167,9 +167,46 @@ export default function NewProposalPage() {
           notes: data.remarks || '',
           sent_at: new Date().toISOString(),
           valid_until: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
-        });
+        })
+        .select()
+        .single();
 
       if (proposalError) throw proposalError;
+
+      // 4. Record as an Invoice
+      const advanceString = String(data.advancePaid || '');
+      const advance = parseFloat(advanceString.replace(/[^0-9.]/g, '')) || 0;
+      const invoiceStatus = advance >= amount ? 'paid' : (advance > 0 ? 'partial' : 'pending');
+
+      const { data: invoice, error: invoiceError } = await supabase
+        .from('invoices')
+        .insert({
+          invoice_number: `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+          customer_id: customer.id,
+          proposal_id: proposal.id,
+          amount: amount,
+          paid_amount: advance,
+          status: invoiceStatus,
+          due_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
+        })
+        .select()
+        .single();
+        
+      if (invoiceError) throw invoiceError;
+
+      // 5. If advance is paid, record a Payment
+      if (advance > 0) {
+        const { error: paymentError } = await supabase
+          .from('payments')
+          .insert({
+            invoice_id: invoice.id,
+            amount: advance,
+            payment_method: 'bank_transfer',
+            notes: 'Advance Payment from Proposal'
+          });
+          
+        if (paymentError) throw paymentError;
+      }
 
       toast.success('Proposal submitted and revenue recorded!');
       router.push('/customers');
