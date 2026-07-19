@@ -37,6 +37,7 @@ export default function InvoicesPage() {
   // Payment Modal State
   const [recordingPaymentFor, setRecordingPaymentFor] = useState<InvoiceWithCustomer | null>(null);
   const [paymentAmount, setPaymentAmount] = useState<string>('');
+  const [discountAmount, setDiscountAmount] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('bank_transfer');
   const [paymentNotes, setPaymentNotes] = useState<string>('');
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
@@ -122,18 +123,21 @@ export default function InvoicesPage() {
     e.preventDefault();
     if (!recordingPaymentFor) return;
 
-    const amountNum = parseFloat(paymentAmount);
-    if (isNaN(amountNum) || amountNum <= 0) {
-      toast.error('Please enter a valid amount');
+    const amountNum = parseFloat(paymentAmount) || 0;
+    const discountNum = parseFloat(discountAmount) || 0;
+    
+    if (amountNum <= 0 && discountNum <= 0) {
+      toast.error('Please enter a valid payment or discount amount');
       return;
     }
 
     const currentPaid = recordingPaymentFor.paid_amount || 0;
     const totalAmount = recordingPaymentFor.amount;
-    const newPaidAmount = currentPaid + amountNum;
+    const totalDeduction = amountNum + discountNum;
+    const newPaidAmount = currentPaid + totalDeduction;
     
     if (newPaidAmount > totalAmount) {
-        toast.error('Payment amount exceeds balance due!');
+        toast.error('Total deduction exceeds balance due!');
         return;
     }
 
@@ -141,17 +145,32 @@ export default function InvoicesPage() {
 
     setIsSubmittingPayment(true);
     try {
-      // 1. Insert Payment
-      const { error: paymentError } = await supabase
-        .from('payments')
-        .insert({
+      // 1. Insert Payment(s)
+      const paymentsToInsert = [];
+      if (amountNum > 0) {
+        paymentsToInsert.push({
           invoice_id: recordingPaymentFor.id,
           amount: amountNum,
           payment_method: paymentMethod,
           notes: paymentNotes
         });
+      }
+      if (discountNum > 0) {
+        paymentsToInsert.push({
+          invoice_id: recordingPaymentFor.id,
+          amount: discountNum,
+          payment_method: 'discount',
+          notes: 'Discount applied'
+        });
+      }
 
-      if (paymentError) throw paymentError;
+      if (paymentsToInsert.length > 0) {
+        const { error: paymentError } = await supabase
+          .from('payments')
+          .insert(paymentsToInsert);
+
+        if (paymentError) throw paymentError;
+      }
 
       // 2. Update Invoice
       const { error: invoiceError } = await supabase
@@ -176,6 +195,7 @@ export default function InvoicesPage() {
       
       setRecordingPaymentFor(null);
       setPaymentAmount('');
+      setDiscountAmount('');
       setPaymentNotes('');
     } catch (err: any) {
       toast.error('Failed to record payment: ' + err.message);
@@ -434,17 +454,29 @@ export default function InvoicesPage() {
             </div>
 
             <form onSubmit={handleRecordPayment} className="space-y-4 text-left">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Payment Amount (₹)</label>
-                <input 
-                  type="number" 
-                  step="0.01"
-                  required 
-                  value={paymentAmount} 
-                  onChange={e => setPaymentAmount(e.target.value)} 
-                  max={recordingPaymentFor.amount - (recordingPaymentFor.paid_amount || 0)}
-                  className="w-full px-3 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-base font-bold text-gray-900" 
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Payment Amount (₹)</label>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    value={paymentAmount} 
+                    onChange={e => setPaymentAmount(e.target.value)} 
+                    max={recordingPaymentFor.amount - (recordingPaymentFor.paid_amount || 0)}
+                    className="w-full px-3 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-base font-bold text-gray-900" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Discount Amount (₹)</label>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    value={discountAmount} 
+                    onChange={e => setDiscountAmount(e.target.value)} 
+                    max={recordingPaymentFor.amount - (recordingPaymentFor.paid_amount || 0)}
+                    className="w-full px-3 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-base font-bold text-gray-900" 
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">Payment Method</label>

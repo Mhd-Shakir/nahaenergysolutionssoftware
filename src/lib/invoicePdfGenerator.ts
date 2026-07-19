@@ -120,14 +120,16 @@ export async function generateInvoicePDF(
   currentY = addHeader('PAYMENT SUMMARY', currentY);
 
   const amount = invoice.amount || 0;
-  const paid = invoice.paid_amount || 0;
-  const balance = amount - paid;
+  const totalDiscount = payments.filter(p => p.payment_method === 'discount').reduce((sum, p) => sum + (p.amount || 0), 0);
+  const totalPaid = payments.filter(p => p.payment_method !== 'discount').reduce((sum, p) => sum + (p.amount || 0), 0);
+  const balance = amount - (totalPaid + totalDiscount);
 
   autoTable(doc, {
     startY: currentY,
     body: [
       ['Total Invoice Amount', formatPDFCurrency(amount)],
-      ['Total Paid', formatPDFCurrency(paid)],
+      ['Discount Applied', formatPDFCurrency(totalDiscount)],
+      ['Total Paid', formatPDFCurrency(totalPaid)],
       ['Balance Due', { content: formatPDFCurrency(balance), styles: { fontStyle: 'bold', fontSize: 14 } }],
     ],
     theme: 'grid',
@@ -138,8 +140,9 @@ export async function generateInvoicePDF(
       1: { halign: 'right', textColor: primaryColor }
     },
     didParseCell: (data) => {
-      if (data.row.index === 1 && data.column.index === 1) data.cell.styles.textColor = [0, 150, 0];
-      if (data.row.index === 2) {
+      if (data.row.index === 1 && data.column.index === 1) data.cell.styles.textColor = [200, 100, 0];
+      if (data.row.index === 2 && data.column.index === 1) data.cell.styles.textColor = [0, 150, 0];
+      if (data.row.index === 3) {
         data.cell.styles.fillColor = [255, 240, 240]; // highlight background for balance
         if (data.column.index === 1) {
           data.cell.styles.fontSize = 14;
@@ -190,13 +193,14 @@ export async function generateInvoicePDF(
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100);
   const notes = [
-    'Bank: ICICI Bank | A/C: 0942 0500 0938 | IFSC: ICIC0000942',
+    'Bank: IDBI | Branch: Kondotty',
+    'A/C Name: NAHA ENERGY SOLUTION',
+    'A/C No: 2258102000003469 | IFSC: IBKL0002258',
     'Please include invoice number in payment remarks.'
   ];
   notes.forEach((note, i) => {
     doc.text(note, margin, currentY + 6 + (i * 5));
   });
-
   // Footer on all pages
   const totalPages = (doc as any).internal.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {

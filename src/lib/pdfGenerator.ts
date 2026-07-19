@@ -156,7 +156,8 @@ export async function generateProposalPDF(customer: Partial<Customer>, proposal:
   const notes = [
     '• Includes installation, structure, KSEB charges and net metering approval.',
     '• Performance warranty on panels: 25-30 years | AMC: 5 years free.',
-    '• Bank: ICICI Bank | A/C: 0942 0500 0938 | IFSC: ICIC0000942',
+    '• Bank: IDBI (Kondotty) | A/C Name: NAHA ENERGY SOLUTION',
+    '• A/C No: 2258102000003469 | IFSC: IBKL0002258',
     '• Payment: 50% Advance | 40% Delivery | 10% Commissioning.'
   ];
   notes.forEach((note, i) => {

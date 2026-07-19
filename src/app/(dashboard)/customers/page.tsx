@@ -37,6 +37,7 @@ export default function CustomersPage() {
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [viewingCustomer, setViewingCustomer] = useState<Customer | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState<string | null>(null);
   const toast = useToast();
@@ -274,7 +275,7 @@ export default function CustomersPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by name, ID, or district..."
+            placeholder="Search by name, ID, or state/district..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 focus:border-[#0B07D7] outline-none transition-all text-sm"
@@ -319,7 +320,7 @@ export default function CustomersPage() {
                 </tr>
               ) : filteredCustomers.length > 0 ? (
                 filteredCustomers.map((c) => (
-                  <tr key={c.id} className="hover:bg-gray-50/50 transition-colors group">
+                  <tr key={c.id} onClick={() => setViewingCustomer(c)} className="hover:bg-gray-50/50 transition-colors group cursor-pointer">
                     <td className="px-6 py-5">
                       <span className="text-xs font-black text-[#0B07D7] bg-blue-50 px-2 py-1 rounded-md">{c.project_id}</span>
                     </td>
@@ -338,7 +339,7 @@ export default function CustomersPage() {
                     <td className="px-6 py-5 text-right">
                       <span className="text-sm font-black text-gray-900">{formatCurrency(c.net_cost)}</span>
                     </td>
-                    <td className="px-6 py-5">
+                    <td className="px-6 py-5" onClick={(e) => e.stopPropagation()}>
                       <select
                         value={c.status}
                         onChange={(e) => handleUpdateStatus(c.id, e.target.value as ProjectStatus)}
@@ -350,7 +351,7 @@ export default function CustomersPage() {
                         {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </td>
-                    <td className="px-6 py-5 text-right">
+                    <td className="px-6 py-5 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
                         <button 
                           onClick={() => handleGenerateInvoice(c)}
@@ -398,7 +399,7 @@ export default function CustomersPage() {
         {/* Mobile Cards */}
         <div className="md:hidden divide-y divide-gray-100">
           {filteredCustomers.map((c) => (
-            <div key={c.id} className="p-5 space-y-4 active:bg-gray-50 transition-colors">
+            <div key={c.id} onClick={() => setViewingCustomer(c)} className="p-5 space-y-4 active:bg-gray-50 transition-colors cursor-pointer">
               <div className="flex justify-between items-start">
                 <div>
                   <span className="text-[10px] font-black text-[#0B07D7] bg-blue-50 px-2 py-0.5 rounded uppercase tracking-widest">{c.project_id}</span>
@@ -408,6 +409,7 @@ export default function CustomersPage() {
                   </p>
                 </div>
                 <select
+                  onClick={(e) => e.stopPropagation()}
                   value={c.status}
                   onChange={(e) => handleUpdateStatus(c.id, e.target.value as ProjectStatus)}
                   className={cn(
@@ -430,7 +432,7 @@ export default function CustomersPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-2 pt-2">
+              <div className="flex items-center justify-between gap-2 pt-2" onClick={(e) => e.stopPropagation()}>
                 <button 
                   onClick={() => handleGenerateInvoice(c)}
                   disabled={isGeneratingInvoice === c.id}
@@ -507,6 +509,91 @@ export default function CustomersPage() {
         </div>
       )}
 
+      {/* View Details Modal */}
+      {viewingCustomer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setViewingCustomer(null)} />
+          <div className="relative bg-white rounded-3xl border border-gray-100 shadow-2xl p-6 md:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-scale-up z-10">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-gray-900">Project Details</h3>
+              <button type="button" onClick={() => setViewingCustomer(null)} className="p-2 bg-gray-50 text-gray-400 rounded-full hover:bg-gray-100"><XCircle className="w-5 h-5" /></button>
+            </div>
+            
+            <div className="space-y-4 text-left">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Client Name</label>
+                  <p className="text-sm font-semibold text-gray-900">{viewingCustomer.name}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Project ID</label>
+                  <p className="text-sm font-semibold text-gray-900">{viewingCustomer.project_id}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Phone</label>
+                  <p className="text-sm font-semibold text-gray-900">{viewingCustomer.phone}</p>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Address</label>
+                  <p className="text-sm font-semibold text-gray-900">{viewingCustomer.address}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">State / District</label>
+                  <p className="text-sm font-semibold text-gray-900">{viewingCustomer.district}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">System (KW)</label>
+                  <p className="text-sm font-semibold text-gray-900">{viewingCustomer.system_kw} KW</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Panel Brand</label>
+                  <p className="text-sm font-semibold text-gray-900">{viewingCustomer.panel_brand}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Inverter Brand</label>
+                  <p className="text-sm font-semibold text-gray-900">{viewingCustomer.inverter_brand}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Net Cost (₹)</label>
+                  <p className="text-sm font-semibold text-gray-900">{formatCurrency(viewingCustomer.net_cost)}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Actual Cost (₹)</label>
+                  <p className="text-sm font-semibold text-gray-900">{formatCurrency(viewingCustomer.actual_cost || 0)}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Subsidy (₹)</label>
+                  <p className="text-sm font-semibold text-gray-900">{formatCurrency(viewingCustomer.subsidy || 0)}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Project Type</label>
+                  <p className="text-sm font-semibold text-gray-900 capitalize">{viewingCustomer.type || 'N/A'}</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Date Added</label>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {new Date(viewingCustomer.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 mb-1">Status</label>
+                  <br />
+                  <span className={cn(
+                    "px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider inline-block",
+                    statusColors[viewingCustomer.status]
+                  )}>
+                    {viewingCustomer.status}
+                  </span>
+                </div>
+              </div>
+              <div className="pt-4 flex gap-3">
+                <button type="button" onClick={() => setViewingCustomer(null)} className="flex-1 py-3 bg-gray-50 text-gray-700 font-bold rounded-2xl border border-gray-200/50 hover:bg-gray-100 active:scale-95 transition-all">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Edit Modal */}
       {editingCustomer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
@@ -532,7 +619,7 @@ export default function CustomersPage() {
                   <input type="text" required value={editingCustomer.address} onChange={e => setEditingCustomer({...editingCustomer, address: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">District</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">State / District</label>
                   <input type="text" required value={editingCustomer.district} onChange={e => setEditingCustomer({...editingCustomer, district: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-sm" />
                 </div>
                 <div>

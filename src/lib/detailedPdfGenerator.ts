@@ -6,6 +6,7 @@ export interface DetailedProposalData {
   clientName: string;
   clientType: 'residential' | 'commercial';
   address: string;
+  clientStateDistrict: string;
   mobileNumber: string;
   date: string;
   projectId: string;
@@ -154,7 +155,7 @@ export async function generateDetailedProposalPDF(data: DetailedProposalData) {
       ['Client Name', data.clientName, 'Date', data.date],
       ['Client Type', data.clientType === 'commercial' ? 'Commercial' : 'Residential', 'Project ID', data.projectId],
       ['Address', data.address, 'Coordinates', data.locationCoordinates],
-      ['Mobile', data.mobileNumber, '', ''],
+      ['Mobile', data.mobileNumber, 'State/District', data.clientStateDistrict || ''],
     ],
     theme: 'plain',
     margin: { bottom: tableBottomMargin },

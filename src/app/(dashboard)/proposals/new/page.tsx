@@ -52,6 +52,7 @@ export default function NewProposalPage() {
     defaultValues: {
       clientName: '',
       clientType: 'residential',
+      clientStateDistrict: '',
       address: '',
       mobileNumber: '',
       date: new Date().toISOString().split('T')[0],
@@ -130,7 +131,7 @@ export default function NewProposalPage() {
           net_cost: amount,
           status: 'quoted',
           type: data.clientType || 'residential', // Use the selected client type from dropdown!
-          district: data.provinceState || 'Kerala',
+          district: data.clientStateDistrict || 'Kerala',
         })
         .select()
         .single();
@@ -143,7 +144,7 @@ export default function NewProposalPage() {
         .insert({
           customer_id: customer.id,
           amount: amount,
-          district: data.provinceState || 'Kerala',
+          district: data.clientStateDistrict || 'Kerala',
           sale_date: new Date().toISOString()
         });
 
@@ -225,6 +226,10 @@ export default function NewProposalPage() {
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Mobile Number</label>
               <input type="tel" {...register('mobileNumber', { required: true })} className={cn("input-field", errors.mobileNumber && "error")} placeholder="Mobile number" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-gray-700">State / District</label>
+              <input {...register('clientStateDistrict', { required: true })} className={cn("input-field", errors.clientStateDistrict && "error")} placeholder="State or District" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-gray-700">Date</label>
