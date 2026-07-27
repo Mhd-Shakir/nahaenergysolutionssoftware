@@ -10,11 +10,21 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+<<<<<<< HEAD
+=======
+  const [showSorry, setShowSorry] = useState(false);
+>>>>>>> 152dc16220950f7a5aa935233d1879bfc97197ce
   const router = useRouter();
   const supabase = createClient();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+<<<<<<< HEAD
+=======
+    setShowSorry(true);
+
+    /* Temporary disabled login logic
+>>>>>>> 152dc16220950f7a5aa935233d1879bfc97197ce
     setLoading(true);
     setError(null);
 
@@ -30,6 +40,10 @@ export default function LoginPage() {
       router.push('/');
       router.refresh();
     }
+<<<<<<< HEAD
+=======
+    */
+>>>>>>> 152dc16220950f7a5aa935233d1879bfc97197ce
   };
 
   return (
@@ -43,67 +57,53 @@ export default function LoginPage() {
             SOLAR BUSINESS MANAGEMENT
           </p>
         </div>
-        
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-          {error && (
-            <div className="bg-red-50 border-l-4 border-red-500 p-4 text-red-700 text-sm">
-              {error}
-            </div>
-          )}
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full px-3 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-[#0047FF] focus:border-[#0047FF] sm:text-sm"
-                placeholder="admin@nahaenergy.com"
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full px-3 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-[#0047FF] focus:border-[#0047FF] sm:text-sm"
-                placeholder="••••••••"
-              />
-            </div>
-          </div>
 
-          <div>
+<<<<<<< HEAD
+=======
+        {showSorry ? (
+          <div className="mt-8 flex flex-col items-center justify-center p-8 bg-white rounded-xl">
+            <AlertCircle className="w-16 h-16 text-red-500 mb-4 animate-bounce" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2 animate-pulse">Sorry!</h2>
+            <p className="text-center text-gray-600">
+              The system is temporarily unavailable. Please try again later.
+            </p>
             <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-[#0047FF] hover:bg-[#0036CC] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0047FF] transition-all disabled:opacity-50 shadow-lg shadow-blue-100"
+              onClick={() => setShowSorry(false)}
+              className="mt-6 px-6 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
             >
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                'Sign In'
-              )}
+              Go Back
             </button>
           </div>
-        </form>
-        
-        <div className="text-center mt-6">
-          <p className="text-xs text-gray-400">
-            &copy; {new Date().getFullYear()} Naha Energy Solutions. All rights reserved.
-          </p>
-        </div>
+        ) : (
+>>>>>>> 152dc16220950f7a5aa935233d1879bfc97197ce
+  <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+    {error && (
+      <div className="bg-red-50 border-l-4 border-red-500 p-4 text-red-700 text-sm">
+        {error}
       </div>
-    </div>
-  );
-}
+    )}
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+          Email address
+        </label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="mt-1 block w-full px-3 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-[#0047FF] focus:border-[#0047FF] sm:text-sm"
+          placeholder="admin@nahaenergy.com"
+        />
+      </div>
+      <div>
+        <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+          Password
+        </label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          required
