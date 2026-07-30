@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
@@ -11,7 +12,8 @@ import {
   LogOut,
   Zap,
   Plus,
-  FileText
+  FileText,
+  Settings
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
@@ -27,9 +29,21 @@ const menuItems = [
 ];
 
 export default function Sidebar() {
+  const [isDeveloper, setIsDeveloper] = useState(false);
   const pathname = usePathname();
   const supabase = createClient();
   const router = useRouter();
+
+  useEffect(() => {
+    checkDev();
+  }, []);
+
+  const checkDev = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user?.email === 'developernaha@gmail.com') {
+      setIsDeveloper(true);
+    }
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -65,7 +79,21 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="p-4 border-t border-gray-100">
+      <div className="p-4 border-t border-gray-100 space-y-2">
+        {isDeveloper && (
+          <Link
+            href="/developer"
+            className={cn(
+              "flex items-center gap-3 w-full px-4 py-3 rounded-lg transition-colors",
+              pathname === '/developer'
+                ? "bg-purple-50 text-purple-600 font-bold border-r-4 border-purple-600"
+                : "text-gray-600 hover:bg-gray-50"
+            )}
+          >
+            <Settings className="w-5 h-5" />
+            <span>Developer Area</span>
+          </Link>
+        )}
         <button
           onClick={handleLogout}
           className="flex items-center gap-3 w-full px-4 py-3 text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"

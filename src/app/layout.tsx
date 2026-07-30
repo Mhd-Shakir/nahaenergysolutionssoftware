@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Outfit } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/Toast";
+import MaintenanceGate from "@/components/MaintenanceGate";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -30,7 +31,9 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${outfit.variable}`}>
       <body className="bg-gray-50 text-gray-900 min-h-screen">
         <ToastProvider>
-          {children}
+          <MaintenanceGate>
+            {children}
+          </MaintenanceGate>
         </ToastProvider>
       </body>
     </html>
