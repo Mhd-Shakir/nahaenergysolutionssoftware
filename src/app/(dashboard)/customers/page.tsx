@@ -24,6 +24,8 @@ import {
   Edit,
   Receipt
 } from 'lucide-react';
+import { statusColors } from '@/lib/colors';
+import { EditProposalModal } from '@/components/EditProposalModal';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 
@@ -596,58 +598,10 @@ export default function CustomersPage() {
 
       {/* Edit Modal */}
       {editingCustomer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditingCustomer(null)} />
-          <div className="relative bg-white rounded-3xl border border-gray-100 shadow-2xl p-6 md:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-scale-up z-10">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-gray-900">Edit Project Details</h3>
-              <button type="button" onClick={() => setEditingCustomer(null)} className="p-2 bg-gray-50 text-gray-400 rounded-full hover:bg-gray-100"><XCircle className="w-5 h-5" /></button>
-            </div>
-            
-            <form onSubmit={handleEditSubmit} className="space-y-4 text-left">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Client Name</label>
-                  <input type="text" required value={editingCustomer.name} onChange={e => setEditingCustomer({...editingCustomer, name: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Phone</label>
-                  <input type="text" required value={editingCustomer.phone} onChange={e => setEditingCustomer({...editingCustomer, phone: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-sm" />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Address</label>
-                  <input type="text" required value={editingCustomer.address} onChange={e => setEditingCustomer({...editingCustomer, address: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">State / District</label>
-                  <input type="text" required value={editingCustomer.district} onChange={e => setEditingCustomer({...editingCustomer, district: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">System (KW)</label>
-                  <input type="number" step="0.1" required value={editingCustomer.system_kw} onChange={e => setEditingCustomer({...editingCustomer, system_kw: parseFloat(e.target.value)})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Panel Brand</label>
-                  <input type="text" required value={editingCustomer.panel_brand} onChange={e => setEditingCustomer({...editingCustomer, panel_brand: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Inverter Brand</label>
-                  <input type="text" required value={editingCustomer.inverter_brand} onChange={e => setEditingCustomer({...editingCustomer, inverter_brand: e.target.value})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Net Cost (₹)</label>
-                  <input type="number" required value={editingCustomer.net_cost} onChange={e => setEditingCustomer({...editingCustomer, net_cost: parseFloat(e.target.value)})} className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0B07D7]/20 outline-none text-sm" />
-                </div>
-              </div>
-              <div className="pt-4 flex gap-3">
-                <button type="button" onClick={() => setEditingCustomer(null)} className="flex-1 py-3 bg-gray-50 text-gray-700 font-bold rounded-2xl border border-gray-200/50 hover:bg-gray-100 active:scale-95 transition-all">Cancel</button>
-                <button type="submit" disabled={isSubmitting} className="flex-1 py-3 bg-[#0B07D7] text-white font-bold rounded-2xl shadow-lg shadow-blue-200 hover:bg-blue-800 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-                  {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />} Save Changes
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <EditProposalModal 
+          customer={editingCustomer} 
+          onClose={() => setEditingCustomer(null)} 
+        />
       )}
 
       {/* Modal animation helper styles */}

@@ -44,11 +44,14 @@ const DEFAULT_PRODUCTS = [
   { name: 'DCMCB', brand: 'HAVELLS/V-GUARD/SCHNEIDER', specification: '16 A', warranty: '10 Year', quantity: '2' }
 ];
 
-export default function NewProposalPage() {
+export default function EditProposalPage({ params }: { params: { id: string } }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
   const toast = useToast();
+  const supabase = createClient();
+  const router = useRouter();
 
-  const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<DetailedProposalData>({
+  const { register, control, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm<DetailedProposalData>({
     defaultValues: {
       clientName: '',
       clientType: 'residential',
@@ -100,6 +103,34 @@ export default function NewProposalPage() {
     setValue('balanceAmount', String(cost - adv));
   }, [totalCostVal, advanceVal, setValue]);
 
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const { data, error } = await supabase
+          .from('proposals')
+          .select('*')
+          .eq('customer_id', params.id)
+          .single();
+        
+        if (error) throw error;
+        
+        if (data && data.notes) {
+          try {
+            const parsed = JSON.parse(data.notes);
+            reset(parsed);
+          } catch(e) {
+            console.error('Failed to parse full proposal data');
+          }
+        }
+      } catch (err: any) {
+        toast.error('Failed to load proposal details');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [params.id, supabase, reset, toast]);
+
   const processSubmitData = (data: DetailedProposalData) => {
     const raw = data as any;
     return {
@@ -115,9 +146,6 @@ export default function NewProposalPage() {
     await generateDetailedProposalPDF(processSubmitData(data));
   };
 
-  const supabase = createClient();
-  const router = useRouter();
-
   const onSubmit = async (rawData: DetailedProposalData) => {
     const data = processSubmitData(rawData);
     setIsSubmitting(true);
@@ -127,11 +155,10 @@ export default function NewProposalPage() {
       const amount = parseFloat(costString.replace(/[^0-9.]/g, '')) || 0;
       const kw = parseFloat(data.products.find(p => p.name.includes('Module'))?.quantity || '0') || 0;
 
-      // 1. Create/Update Customer entry
-      const { data: customer, error: custError } = await supabase
+      // 1. Update Customer entry
+      const { error: custError } = await supabase
         .from('customers')
-        .insert({
-          project_id: data.projectId || `PJ-${Math.floor(Math.random() * 10000)}`,
+        .update({
           name: data.clientName,
           phone: data.mobileNumber,
           address: data.address,
@@ -139,92 +166,36 @@ export default function NewProposalPage() {
           panel_brand: data.products.find(p => p.name.includes('Module'))?.brand || 'Standard',
           inverter_brand: data.products.find(p => p.name.includes('Inverter'))?.brand || 'Standard',
           actual_cost: amount,
-          subsidy: 0, // Default to 0, can be updated later
           net_cost: amount,
-          status: 'quoted',
-          type: data.clientType || 'residential', // Use the selected client type from dropdown!
+          type: data.clientType || 'residential',
           district: data.clientStateDistrict || 'Kerala',
         })
-        .select()
-        .single();
+        .eq('id', params.id);
 
       if (custError) throw custError;
 
-      // 2. Record as a Sale for Analytics
-      const { error: saleError } = await supabase
-        .from('sales')
-        .insert({
-          customer_id: customer.id,
-          amount: amount,
-          district: data.clientStateDistrict || 'Kerala',
-          sale_date: new Date().toISOString()
-        });
-
-      if (saleError) throw saleError;
-
-      // 3. Record as a Proposal in the database
-      const { data: proposal, error: proposalError } = await supabase
+      // 2. Update Proposal entry
+      const { error: proposalError } = await supabase
         .from('proposals')
-        .insert({
-          proposal_number: data.projectId || `PJ-${Math.floor(Math.random() * 10000)}`,
-          customer_id: customer.id,
+        .update({
           system_kw: kw,
           panel_brand: data.products.find(p => p.name.includes('Module'))?.brand || 'Standard',
           inverter_brand: data.products.find(p => p.name.includes('Inverter'))?.brand || 'Standard',
           actual_cost: amount,
-          subsidy: 0,
           net_cost: amount,
           daily_output_min: Math.floor(kw * 3.8),
           daily_output_max: Math.ceil(kw * 4.2),
           notes: JSON.stringify(data),
-          sent_at: new Date().toISOString(),
-          valid_until: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
         })
-        .select()
-        .single();
+        .eq('customer_id', params.id);
 
       if (proposalError) throw proposalError;
 
-      // 4. Record as an Invoice
-      const advanceString = String(data.advancePaid || '');
-      const advance = parseFloat(advanceString.replace(/[^0-9.]/g, '')) || 0;
-      const invoiceStatus = advance >= amount ? 'paid' : (advance > 0 ? 'partial' : 'pending');
-
-      const { data: invoice, error: invoiceError } = await supabase
-        .from('invoices')
-        .insert({
-          invoice_number: `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-          customer_id: customer.id,
-          proposal_id: proposal.id,
-          amount: amount,
-          paid_amount: advance,
-          status: invoiceStatus,
-          due_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
-        })
-        .select()
-        .single();
-        
-      if (invoiceError) throw invoiceError;
-
-      // 5. If advance is paid, record a Payment
-      if (advance > 0) {
-        const { error: paymentError } = await supabase
-          .from('payments')
-          .insert({
-            invoice_id: invoice.id,
-            amount: advance,
-            payment_method: 'bank_transfer',
-            notes: 'Advance Payment from Proposal'
-          });
-          
-        if (paymentError) throw paymentError;
-      }
-
-      toast.success('Proposal submitted and revenue recorded!');
+      toast.success('Proposal updated successfully!');
       router.push('/customers');
     } catch (err: any) {
-      console.error('Submission Error:', err);
-      toast.error('Error saving proposal: ' + err.message);
+      console.error('Update Error:', err);
+      toast.error('Error updating proposal: ' + err.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -242,12 +213,20 @@ export default function NewProposalPage() {
     </div>
   );
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-12 h-12 text-[#0B07D7] animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto py-4 md:py-8 px-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Solar Proposal Form</h1>
-          <p className="text-gray-500 mt-1 text-sm md:text-base">Fill in the details to generate a professional proposal document.</p>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Edit Solar Proposal</h1>
+          <p className="text-gray-500 mt-1 text-sm md:text-base">Modify the details to update the professional proposal document.</p>
         </div>
 
       </div>
