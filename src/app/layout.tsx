@@ -17,9 +17,6 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: "Naha Energy Solutions | Solar Business Management",
   description: "MNRE Approved | KSEB Grid Connect System | Kerala",
-  icons: {
-    icon: "/icon.png",
-  },
 };
 
 export default function RootLayout({
