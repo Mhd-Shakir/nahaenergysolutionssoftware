@@ -24,7 +24,6 @@ import {
   Edit,
   Receipt
 } from 'lucide-react';
-import { statusColors } from '@/lib/colors';
 import { EditProposalModal } from '@/components/EditProposalModal';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';

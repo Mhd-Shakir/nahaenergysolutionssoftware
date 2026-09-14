@@ -15,7 +15,8 @@ import {
   Smartphone,
   CreditCard,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { generateDetailedProposalPDF, DetailedProposalData } from '@/lib/detailedPdfGenerator';
