@@ -17,7 +17,9 @@ import {
   CheckCircle2,
   AlertCircle,
   XCircle,
-  Loader2
+  Loader2,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { generateDetailedProposalPDF, DetailedProposalData } from '@/lib/detailedPdfGenerator';
@@ -91,7 +93,7 @@ export function EditProposalModal({ customer, onClose }: { customer: any, onClos
     defaultValues
   });
 
-  const { fields } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control,
     name: "products"
   });
@@ -204,15 +206,18 @@ export function EditProposalModal({ customer, onClose }: { customer: any, onClos
     }
   };
 
-  const SectionHeader = ({ icon: Icon, title, section }: { icon: any, title: string, section: string }) => (
-    <div className="flex items-center gap-3 border-b border-gray-100 pb-4 mb-6">
-      <div className="p-2 bg-[#0B07D7]/10 rounded-lg">
-        <Icon className="w-5 h-5 text-[#0B07D7]" />
+  const SectionHeader = ({ icon: Icon, title, section, action }: { icon: any, title: string, section: string, action?: React.ReactNode }) => (
+    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-4 mb-6">
+      <div className="flex items-center gap-3">
+        <div className="p-2 bg-[#0B07D7]/10 rounded-lg">
+          <Icon className="w-5 h-5 text-[#0B07D7]" />
+        </div>
+        <div>
+          <p className="text-[10px] font-bold text-[#0B07D7] uppercase tracking-wider">{section}</p>
+          <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+        </div>
       </div>
-      <div>
-        <p className="text-[10px] font-bold text-[#0B07D7] uppercase tracking-wider">{section}</p>
-        <h2 className="text-xl font-bold text-gray-900">{title}</h2>
-      </div>
+      {action && <div>{action}</div>}
     </div>
   );
 
@@ -327,7 +332,21 @@ export function EditProposalModal({ customer, onClose }: { customer: any, onClos
 
         {/* Section 3: Product Specifications */}
         <div className="bg-white p-5 md:p-8 rounded-2xl md:rounded-3xl border border-gray-100 shadow-xl shadow-gray-50 overflow-hidden">
-          <SectionHeader icon={Zap} section="Section 3" title="Product Specifications" />
+          <SectionHeader 
+            icon={Zap} 
+            section="Section 3" 
+            title="Product Specifications" 
+            action={
+              <button
+                type="button"
+                onClick={() => append({ name: '', brand: '', specification: '', warranty: '', quantity: '' })}
+                className="inline-flex items-center gap-2 px-3.5 py-2 text-xs md:text-sm font-bold text-white bg-[#0B07D7] hover:bg-[#0B07D7]/90 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Row</span>
+              </button>
+            }
+          />
           <div className="overflow-x-auto -mx-5 md:-mx-8">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -337,6 +356,7 @@ export function EditProposalModal({ customer, onClose }: { customer: any, onClos
                   <th className="px-4 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Specification</th>
                   <th className="px-4 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Warranty</th>
                   <th className="px-8 py-4 text-xs font-black text-gray-400 uppercase tracking-widest">Quantity</th>
+                  <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-widest text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -346,6 +366,7 @@ export function EditProposalModal({ customer, onClose }: { customer: any, onClos
                       <input 
                         {...register(`products.${index}.name`, { required: true })} 
                         className={cn("w-full bg-transparent font-bold text-gray-900 outline-none border-b border-transparent focus:border-[#0B07D7]", errors.products?.[index]?.name && "error")} 
+                        placeholder="Product name"
                       />
                     </td>
                     <td className="px-4 py-3">
@@ -358,7 +379,7 @@ export function EditProposalModal({ customer, onClose }: { customer: any, onClos
                       <input {...register(`products.${index}.warranty`, { required: true })} className={cn("table-input", errors.products?.[index]?.warranty && "error")} placeholder="Warranty" />
                     </td>
                     <td className="px-8 py-3">
-                      {field.name === 'Solar Module' ? (
+                      {watch(`products.${index}.name`) === 'Solar Module' || field.name === 'Solar Module' ? (
                         <div className="flex flex-col gap-2 w-full">
                           <select 
                             {...register(`products.${index}.quantity`, { required: true })} 
@@ -383,10 +404,38 @@ export function EditProposalModal({ customer, onClose }: { customer: any, onClos
                         <input {...register(`products.${index}.quantity`, { required: true })} className={cn("table-input", errors.products?.[index]?.quantity && "error")} placeholder="Quantity" />
                       )}
                     </td>
+                    <td className="px-6 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => remove(index)}
+                        className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        title="Remove row"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
+                {fields.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="text-center py-8 text-gray-400">
+                      <p className="text-sm font-medium">No products configured</p>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
+          </div>
+          <div className="mt-4 pt-3 flex items-center justify-between border-t border-gray-100">
+            <span className="text-xs font-semibold text-gray-400">{fields.length} {fields.length === 1 ? 'item' : 'items'} in specification</span>
+            <button
+              type="button"
+              onClick={() => append({ name: '', brand: '', specification: '', warranty: '', quantity: '' })}
+              className="inline-flex items-center gap-2 px-4 py-2 text-xs md:text-sm font-bold text-[#0B07D7] bg-[#0B07D7]/10 hover:bg-[#0B07D7] hover:text-white rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Row</span>
+            </button>
           </div>
         </div>
 

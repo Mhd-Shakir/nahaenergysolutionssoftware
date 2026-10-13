@@ -4,34 +4,35 @@ import { Bell, Search, User } from 'lucide-react';
 
 export default function TopBar() {
   return (
-    <header className="h-16 bg-white border-b border-gray-200 px-4 md:px-8 flex items-center justify-between sticky top-0 z-40">
-      <div className="flex items-center gap-4">
+    <header className="h-20 bg-white/80 backdrop-blur-md border-b border-gray-100 px-6 md:px-10 flex items-center justify-between sticky top-0 z-40 transition-all">
+      <div className="flex items-center gap-6 flex-1">
         <div className="md:hidden">
-          <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
+          <img src="/logo.png" alt="Logo" className="h-10 w-auto" />
         </div>
-        <div className="relative w-full max-w-[240px] md:w-96 hidden sm:block">
-          <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-            <Search className="w-4 h-4" />
+        <div className="relative w-full max-w-md hidden sm:block">
+          <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-gray-400">
+            <Search className="w-5 h-5" />
           </span>
           <input
             type="text"
-            placeholder="Search..."
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-1 focus:ring-[#0047FF] focus:border-[#0047FF] text-xs md:text-sm"
+            placeholder="Search proposals, customers..."
+            className="block w-full pl-12 pr-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50/50 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#0047FF]/20 focus:border-[#0047FF] text-sm text-gray-700 transition-all shadow-sm"
           />
         </div>
       </div>
 
-      <div className="flex items-center gap-2 md:gap-4">
-        <button className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors">
+      <div className="flex items-center gap-4 md:gap-6">
+        <button className="relative p-2.5 text-gray-500 hover:text-[#0047FF] rounded-full hover:bg-blue-50 transition-all">
           <Bell className="w-5 h-5" />
+          <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
         </button>
-        <div className="h-8 w-px bg-gray-200 mx-1 md:mx-2" />
-        <div className="flex items-center gap-3">
+        <div className="h-10 w-px bg-gray-200 mx-2" />
+        <div className="flex items-center gap-4 cursor-pointer group">
           <div className="text-right hidden md:block">
-            <p className="text-sm font-bold text-gray-900 leading-tight">Admin User</p>
-            <p className="text-[10px] text-gray-500 font-medium">Naha Energy</p>
+            <p className="text-sm font-semibold text-gray-900 leading-tight group-hover:text-[#0047FF] transition-colors">Admin User</p>
+            <p className="text-xs text-gray-500 font-medium mt-0.5">Naha Energy</p>
           </div>
-          <div className="h-9 w-9 md:h-10 md:w-10 rounded-full bg-blue-100 flex items-center justify-center border border-blue-200 shadow-sm">
+          <div className="h-10 w-10 md:h-11 md:w-11 rounded-full bg-gradient-to-tr from-blue-100 to-blue-50 flex items-center justify-center border border-blue-200 shadow-sm group-hover:shadow-md transition-all">
             <User className="w-5 h-5 md:w-6 md:h-6 text-[#0047FF]" />
           </div>
         </div>

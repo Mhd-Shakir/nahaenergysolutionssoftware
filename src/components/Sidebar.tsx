@@ -51,14 +51,18 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="hidden md:flex w-64 bg-white border-r border-gray-200 h-screen sticky top-0 flex-col">
-      <div className="p-6">
+    <aside className="hidden md:flex w-72 bg-white/60 backdrop-blur-md border-r border-gray-100 h-screen sticky top-0 flex-col shadow-sm">
+      <div className="p-8 pb-4 flex justify-center">
         <Link href="/" className="flex items-center gap-2">
-          <img src="/logo.png" alt="Naha Energy" className="h-12 w-auto object-contain" />
+          <img src="/logo.png" alt="Naha Energy" className="h-14 w-auto object-contain transition-transform hover:scale-105" />
         </Link>
       </div>
 
-      <nav className="flex-1 px-4 py-4 space-y-1">
+      <div className="px-6 mb-2">
+        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-3 mt-4">Main Menu</h3>
+      </div>
+
+      <nav className="flex-1 px-4 py-2 space-y-2 overflow-y-auto">
         {menuItems.map((item) => {
           const isActive = pathname === item.href;
           return (
@@ -66,40 +70,40 @@ export default function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
+                "flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all duration-200",
                 isActive 
-                  ? "bg-blue-50 text-[#0047FF] border-r-4 border-[#0047FF] font-bold" 
-                  : "text-gray-600 hover:bg-gray-50"
+                  ? "bg-[#0047FF] text-white shadow-md shadow-blue-200 font-semibold" 
+                  : "text-gray-500 hover:bg-blue-50 hover:text-[#0047FF]"
               )}
             >
-              <item.icon className="w-5 h-5" />
-              <span>{item.label}</span>
+              <item.icon className={cn("w-5 h-5", isActive ? "text-white" : "")} />
+              <span className="text-sm">{item.label}</span>
             </Link>
           );
         })}
       </nav>
 
-      <div className="p-4 border-t border-gray-100 space-y-2">
+      <div className="p-4 mx-4 mb-4 border-t border-gray-100 space-y-2">
         {isDeveloper && (
           <Link
             href="/developer"
             className={cn(
-              "flex items-center gap-3 w-full px-4 py-3 rounded-lg transition-colors",
+              "flex items-center gap-4 w-full px-4 py-3 rounded-xl transition-all duration-200",
               pathname === '/developer'
-                ? "bg-purple-50 text-purple-600 font-bold border-r-4 border-purple-600"
-                : "text-gray-600 hover:bg-gray-50"
+                ? "bg-purple-600 text-white font-semibold shadow-md shadow-purple-200"
+                : "text-gray-500 hover:bg-purple-50 hover:text-purple-600"
             )}
           >
             <Settings className="w-5 h-5" />
-            <span>Developer Area</span>
+            <span className="text-sm">Developer Area</span>
           </Link>
         )}
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 w-full px-4 py-3 text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
+          className="flex items-center gap-4 w-full px-4 py-3 text-gray-500 hover:bg-red-50 hover:text-red-600 rounded-xl transition-all duration-200"
         >
           <LogOut className="w-5 h-5" />
-          <span>Logout</span>
+          <span className="text-sm font-medium">Logout</span>
         </button>
       </div>
     </aside>
